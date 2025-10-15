@@ -15,6 +15,7 @@
  */
 
 #include "protocol_parser.h"
+#include "pattern_storage.h"
 #include "esp_log.h"
 #include "esp_rom_crc.h"
 #include "freertos/FreeRTOS.h"
@@ -500,13 +501,12 @@ static esp_err_t handle_put_end(const tlv_frame_t* frame, int client_fd)
     // Transition to STORING state
     g_upload_session.state = UPLOAD_STATE_STORING;
 
-    // TODO: Task 5 - Write to storage
-    // esp_err_t ret = pattern_storage_write(
-    //     g_upload_session.filename,
-    //     g_upload_session.upload_buffer,
-    //     g_upload_session.expected_size
-    // );
-    esp_err_t ret = ESP_OK; // Stub - assume success
+    // Phase 3: Write to storage using Task 5 atomic write API
+    esp_err_t ret = template_storage_write(
+        g_upload_session.filename,
+        g_upload_session.upload_buffer,
+        g_upload_session.expected_size
+    );
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "PUT_END: Storage write failed (%s)", esp_err_to_name(ret));
