@@ -132,6 +132,69 @@ esp_err_t storage_pattern_list(char **pattern_list, size_t max_count, size_t *ou
  */
 esp_err_t storage_pattern_count(size_t *out_count);
 
+// ============================================================================
+// Template Storage API (Atomic Write Semantics)
+// ============================================================================
+
+/**
+ * @brief Write template data with atomic semantics
+ *
+ * Writes template to temporary file, syncs to disk, then atomically renames
+ * to final location. Guarantees no partial writes are visible.
+ *
+ * Flow: <name>.tmp → fflush → fsync → rename → <name>
+ *
+ * @param template_id Template identifier (e.g., "palette.dat", "template_001")
+ * @param data Template binary data
+ * @param len Data length in bytes
+ * @return ESP_OK on success
+ * @return ESP_ERR_INVALID_ARG if parameters are invalid
+ * @return ESP_ERR_NO_MEM if filesystem error
+ * @return ESP_FAIL if write/sync/rename fails (temp file cleaned up)
+ */
+esp_err_t template_storage_write(const char *template_id, const uint8_t *data, size_t len);
+
+/**
+ * @brief Read template data from storage
+ *
+ * Retrieves template binary data from /littlefs/templates/
+ *
+ * @param template_id Template identifier
+ * @param buffer Output buffer for template data
+ * @param buffer_size Size of output buffer
+ * @param out_size Actual bytes read (output parameter)
+ * @return ESP_OK on success
+ * @return ESP_ERR_INVALID_ARG if parameters are invalid
+ * @return ESP_ERR_NOT_FOUND if template doesn't exist
+ * @return ESP_ERR_INVALID_SIZE if buffer is too small
+ */
+esp_err_t template_storage_read(const char *template_id, uint8_t *buffer, size_t buffer_size, size_t *out_size);
+
+/**
+ * @brief List all stored templates
+ *
+ * Enumerates template files in /littlefs/templates/, skipping temporary files.
+ *
+ * @param template_list Array of template ID strings (caller must allocate)
+ * @param max_count Maximum templates to list
+ * @param out_count Actual template count (output parameter)
+ * @return ESP_OK on success
+ * @return ESP_ERR_INVALID_ARG if parameters are invalid
+ */
+esp_err_t template_storage_list(char **template_list, size_t max_count, size_t *out_count);
+
+/**
+ * @brief Delete a template from storage
+ *
+ * Removes template file and any leftover temporary files.
+ *
+ * @param template_id Template identifier
+ * @return ESP_OK on success
+ * @return ESP_ERR_INVALID_ARG if template_id is NULL
+ * @return ESP_ERR_NOT_FOUND if template doesn't exist
+ */
+esp_err_t template_storage_delete(const char *template_id);
+
 #ifdef __cplusplus
 }
 #endif

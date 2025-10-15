@@ -15,9 +15,11 @@
 
 static const char *TAG = "storage_crud";
 
-// Pattern storage directory
+// Storage directories
 #define PATTERN_DIR     "/littlefs/patterns"
+#define TEMPLATE_DIR    "/littlefs/templates"
 #define MAX_FILENAME    64
+#define TEMP_SUFFIX     ".tmp"
 
 /**
  * @brief Helper: Build pattern file path
@@ -227,5 +229,218 @@ esp_err_t storage_pattern_count(size_t *out_count) {
     *out_count = count;
 
     ESP_LOGD(TAG, "Pattern count: %zu", count);
+    return ESP_OK;
+}
+
+// ============================================================================
+// Template Storage Functions (Atomic Write Flow)
+// ============================================================================
+
+/**
+ * @brief Helper: Build template file path
+ * @param template_id Template identifier
+ * @param path Output path buffer
+ * @param len Buffer length
+ */
+static void build_template_path(const char *template_id, char *path, size_t len) {
+    snprintf(path, len, "%s/%s", TEMPLATE_DIR, template_id);
+}
+
+/**
+ * @brief Helper: Build temporary file path
+ * @param template_id Template identifier
+ * @param path Output path buffer
+ * @param len Buffer length
+ */
+static void build_temp_path(const char *template_id, char *path, size_t len) {
+    snprintf(path, len, "%s/%s%s", TEMPLATE_DIR, template_id, TEMP_SUFFIX);
+}
+
+esp_err_t template_storage_write(const char *template_id, const uint8_t *data, size_t len) {
+    if (!template_id || !data || len == 0) {
+        ESP_LOGE(TAG, "Invalid arguments: template_id=%p, data=%p, len=%zu",
+                 (void*)template_id, (void*)data, len);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Ensure templates directory exists
+    struct stat st;
+    if (stat(TEMPLATE_DIR, &st) != 0) {
+        ESP_LOGI(TAG, "Creating templates directory: %s", TEMPLATE_DIR);
+        if (mkdir(TEMPLATE_DIR, 0755) != 0) {
+            ESP_LOGE(TAG, "Failed to create templates directory");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    // Build paths
+    char temp_path[MAX_FILENAME];
+    char final_path[MAX_FILENAME];
+    build_temp_path(template_id, temp_path, sizeof(temp_path));
+    build_template_path(template_id, final_path, sizeof(final_path));
+
+    // Write to temporary file
+    FILE *f = fopen(temp_path, "wb");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to create temp file: %s", temp_path);
+        return ESP_ERR_NO_MEM;
+    }
+
+    size_t written = fwrite(data, 1, len, f);
+
+    // Ensure data is flushed to disk
+    if (fflush(f) != 0) {
+        ESP_LOGE(TAG, "Failed to flush temp file: %s", temp_path);
+        fclose(f);
+        remove(temp_path);  // Clean up temp file
+        return ESP_FAIL;
+    }
+
+    // Sync to ensure durability (fsync via fileno)
+    int fd = fileno(f);
+    if (fd >= 0) {
+        fsync(fd);
+    }
+
+    fclose(f);
+
+    // Check write was complete
+    if (written != len) {
+        ESP_LOGE(TAG, "Failed to write template data: wrote %zu/%zu bytes", written, len);
+        remove(temp_path);  // Clean up incomplete temp file
+        return ESP_FAIL;
+    }
+
+    // Atomically replace target file
+    if (rename(temp_path, final_path) != 0) {
+        ESP_LOGE(TAG, "Failed to rename temp file to final: %s -> %s", temp_path, final_path);
+        remove(temp_path);  // Clean up temp file
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Template written atomically: %s (%zu bytes)", template_id, len);
+    return ESP_OK;
+}
+
+esp_err_t template_storage_read(const char *template_id, uint8_t *buffer, size_t buffer_size, size_t *out_size) {
+    if (!template_id || !buffer || !out_size) {
+        ESP_LOGE(TAG, "Invalid arguments: template_id=%p, buffer=%p, out_size=%p",
+                 (void*)template_id, (void*)buffer, (void*)out_size);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[MAX_FILENAME];
+    build_template_path(template_id, path, sizeof(path));
+
+    // Check if file exists and get size
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        ESP_LOGW(TAG, "Template not found: %s", template_id);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Validate buffer size
+    if ((size_t)st.st_size > buffer_size) {
+        ESP_LOGE(TAG, "Buffer too small for template: need %ld bytes, have %zu",
+                 st.st_size, buffer_size);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Read template data
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to open template: %s", path);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    size_t bytes_read = fread(buffer, 1, buffer_size, f);
+    fclose(f);
+
+    if (bytes_read != (size_t)st.st_size) {
+        ESP_LOGE(TAG, "Failed to read complete template: read %zu/%ld bytes",
+                 bytes_read, st.st_size);
+        return ESP_FAIL;
+    }
+
+    *out_size = bytes_read;
+    ESP_LOGI(TAG, "Template read: %s (%zu bytes)", template_id, bytes_read);
+    return ESP_OK;
+}
+
+esp_err_t template_storage_list(char **template_list, size_t max_count, size_t *out_count) {
+    if (!template_list || !out_count) {
+        ESP_LOGE(TAG, "Invalid arguments: template_list=%p, out_count=%p",
+                 (void*)template_list, (void*)out_count);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_count = 0;  // Initialize output
+
+    DIR *dir = opendir(TEMPLATE_DIR);
+    if (!dir) {
+        ESP_LOGW(TAG, "Templates directory not found: %s", TEMPLATE_DIR);
+        return ESP_OK;  // Empty list is valid
+    }
+
+    size_t count = 0;
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL && count < max_count) {
+        // Skip . and ..
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Skip temporary files
+        const char *temp_ext = strstr(entry->d_name, TEMP_SUFFIX);
+        if (temp_ext && strcmp(temp_ext, TEMP_SUFFIX) == 0) {
+            ESP_LOGD(TAG, "Skipping temp file: %s", entry->d_name);
+            continue;
+        }
+
+        // Add template to list
+        size_t name_len = strlen(entry->d_name);
+        if (name_len > 0 && name_len < MAX_FILENAME) {
+            strncpy(template_list[count], entry->d_name, name_len);
+            template_list[count][name_len] = '\0';
+            count++;
+        }
+    }
+
+    closedir(dir);
+    *out_count = count;
+
+    ESP_LOGI(TAG, "Template list: %zu templates found", count);
+    return ESP_OK;
+}
+
+esp_err_t template_storage_delete(const char *template_id) {
+    if (!template_id) {
+        ESP_LOGE(TAG, "Invalid argument: template_id is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[MAX_FILENAME];
+    build_template_path(template_id, path, sizeof(path));
+
+    // Check if file exists
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        ESP_LOGW(TAG, "Template not found for delete: %s", template_id);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Delete the file
+    if (remove(path) != 0) {
+        ESP_LOGE(TAG, "Failed to delete template: %s", template_id);
+        return ESP_FAIL;
+    }
+
+    // Also try to clean up any leftover temp files
+    char temp_path[MAX_FILENAME];
+    build_temp_path(template_id, temp_path, sizeof(temp_path));
+    remove(temp_path);  // Ignore errors - temp file may not exist
+
+    ESP_LOGI(TAG, "Template deleted: %s", template_id);
     return ESP_OK;
 }
