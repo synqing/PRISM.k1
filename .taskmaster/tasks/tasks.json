@@ -9,7 +9,9 @@
         "testStrategy": "Run idf.py build to verify successful compilation; check that all components are detected",
         "priority": "high",
         "dependencies": [],
-        "status": "pending"
+        "status": "done",
+        "updatedAt": "2025-10-15T01:55:00.892Z",
+        "subtasks": []
       },
       {
         "id": "2",
@@ -21,7 +23,9 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending"
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2025-10-15T01:55:17.454Z"
       },
       {
         "id": "3",
@@ -33,7 +37,8 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "4",
@@ -46,7 +51,8 @@
           "2",
           "3"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "5",
@@ -58,7 +64,8 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "6",
@@ -70,7 +77,8 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "7",
@@ -83,7 +91,8 @@
           "5",
           "6"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "8",
@@ -95,7 +104,8 @@
         "dependencies": [
           "7"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "9",
@@ -107,7 +117,8 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "10",
@@ -119,7 +130,8 @@
         "dependencies": [
           "9"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "11",
@@ -131,7 +143,8 @@
         "dependencies": [
           "10"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "12",
@@ -145,7 +158,8 @@
           "4",
           "5"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "13",
@@ -158,7 +172,8 @@
           "11",
           "4"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "14",
@@ -171,7 +186,8 @@
           "11",
           "4"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "15",
@@ -183,7 +199,8 @@
         "dependencies": [
           "10"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "16",
@@ -195,7 +212,8 @@
         "dependencies": [
           "15"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "17",
@@ -208,7 +226,8 @@
           "15",
           "16"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "18",
@@ -220,7 +239,8 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "19",
@@ -232,7 +252,8 @@
         "dependencies": [
           "18"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "20",
@@ -244,7 +265,8 @@
         "dependencies": [
           "19"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "21",
@@ -257,7 +279,8 @@
           "19",
           "7"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "22",
@@ -270,7 +293,8 @@
           "18",
           "16"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "23",
@@ -283,7 +307,8 @@
           "18",
           "19"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "24",
@@ -296,7 +321,8 @@
           "11",
           "18"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "25",
@@ -310,7 +336,8 @@
           "18",
           "4"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "26",
@@ -322,7 +349,8 @@
         "dependencies": [
           "10"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "27",
@@ -334,7 +362,8 @@
         "dependencies": [
           "12"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "28",
@@ -346,7 +375,8 @@
         "dependencies": [
           "12"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "29",
@@ -359,7 +389,8 @@
           "4",
           "7"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "30",
@@ -372,7 +403,8 @@
           "4",
           "29"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "31",
@@ -386,7 +418,8 @@
           "7",
           "4"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "32",
@@ -400,7 +433,8 @@
           "12",
           "16"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "33",
@@ -413,7 +447,8 @@
           "31",
           "32"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "34",
@@ -427,7 +462,8 @@
           "20",
           "12"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "35",
@@ -439,7 +475,8 @@
         "dependencies": [
           "32"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "36",
@@ -453,7 +490,8 @@
           "2",
           "3"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "37",
@@ -466,7 +504,8 @@
           "12",
           "36"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "38",
@@ -478,7 +517,8 @@
         "dependencies": [
           "36"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "39",
@@ -490,7 +530,8 @@
         "dependencies": [
           "38"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "40",
@@ -502,7 +543,8 @@
         "dependencies": [
           "38"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "41",
@@ -515,7 +557,8 @@
           "39",
           "40"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "42",
@@ -527,7 +570,8 @@
         "dependencies": [
           "38"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "43",
@@ -539,7 +583,8 @@
         "dependencies": [
           "38"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "44",
@@ -551,7 +596,8 @@
         "dependencies": [
           "42"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "45",
@@ -563,7 +609,8 @@
         "dependencies": [
           "41"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "46",
@@ -576,7 +623,8 @@
           "40",
           "41"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "47",
@@ -589,7 +637,8 @@
           "46",
           "39"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "48",
@@ -602,7 +651,8 @@
           "46",
           "40"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "49",
@@ -615,7 +665,8 @@
           "48",
           "47"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "50",
@@ -627,7 +678,8 @@
         "dependencies": [
           "49"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "51",
@@ -640,7 +692,8 @@
           "47",
           "41"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "52",
@@ -653,7 +706,8 @@
           "47",
           "50"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       },
       {
         "id": "53",
@@ -666,8 +720,18 @@
           "41",
           "50"
         ],
-        "status": "pending"
+        "status": "pending",
+        "subtasks": []
       }
-    ]
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2025-10-15T01:55:17.455Z",
+      "taskCount": 53,
+      "completedCount": 2,
+      "tags": [
+        "master"
+      ]
+    }
   }
 }

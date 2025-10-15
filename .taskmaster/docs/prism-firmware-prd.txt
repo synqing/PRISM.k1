@@ -1,363 +1,325 @@
-<context>
-# Overview
-PRISM.K1 is an ESP32-S3 firmware that transforms the K1 hardware into a sophisticated LED pattern controller with REST API management, WebSocket real-time control, and robust file storage. It solves the problem of efficient pattern storage, playback, and live control for LED installations, targeting professional lighting designers and interactive installations. The firmware provides HTTPS secure communication, binary pattern file support with compression, and atomic operations for reliability.
+# PRISM K1 Firmware Implementation PRD
 
-# Core Features
+## Overview
+Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, WebSocket control, and 15-20 template patterns. Focus on reliability, minimal memory footprint, and instant pattern switching via structural efficiency (not compression).
 
-## HTTPS REST API Server
-- Secure REST endpoints for pattern management (upload, list, delete)
-- Streaming multipart uploads with progress tracking
-- JSON responses with comprehensive error codes
-- Self-signed certificate support for secure communication
-- Rate limiting and concurrent upload protection
+## Why
+- Current market demands sub-minute setup (competitors: 5+ minutes)
+- Users expect template-first experience (80% never create custom)
+- ESP32 constraints require careful architecture (512KB RAM, fragmentation risk)
+- WebSocket enables real-time preview during upload
 
-## WebSocket Real-time Control
-- Live parameter updates at 30Hz
-- Command queue system for playback control
-- Progress notifications during uploads
-- Event broadcasting to multiple clients
-- Binary and text message support
+## Success Criteria
+- Memory: <150KB heap usage at runtime, zero fragmentation after 24h
+- Performance: <100ms pattern switch, 60 FPS LED output
+- Reliability: 99.9% uptime, graceful WiFi recovery
+- Storage: 25-35 patterns in 1.47MB LittleFS
+- Templates: 15 working patterns on first boot
+- Protocol: WebSocket stable at 500KB/s transfer
 
-## LittleFS File Storage
-- Wear-leveling filesystem for ESP32 flash
-- Atomic file operations with rename-based commits
-- Power-loss safe upload handling
-- Index management with JSON metadata
-- Automatic filesystem reconciliation on boot
+## Core Features
 
-## Binary Pattern Format (.prism files)
-- TLV (Type-Length-Value) structure for extensibility
-- CRC32 header validation
-- SHA256 full-file integrity verification
-- Heatshrink compression support
-- Manifest metadata embedding
+### WebSocket Communication Layer
+- Binary protocol with TLV message structure
+- Message types: PUT_BEGIN, PUT_DATA, PUT_END, CONTROL, STATUS
+- 8KB receive buffer (prevents fragmentation)
+- Automatic reconnection with exponential backoff
+- Error codes: 0x01 (busy), 0x02 (storage full), 0x03 (invalid format)
 
-## Execution Engine
-- Timeline-based pattern playback
-- Curve interpolation for smooth animations
-- Palette management system
-- 60 FPS LED frame generation
-- Live parameter modulation
+### Storage System (LittleFS)
+- Partition: 1.47MB usable space
+- File structure: /patterns/*.prism, /templates/*.prism
+- Structural efficiency: Shared palettes, delta encoding, hot cache
+- Pattern header: 1KB metadata (uncompressed for instant access)
+- Write verification with CRC32
 
-## mDNS Discovery
-- Automatic network service advertisement
-- Zero-configuration discovery
-- Service metadata broadcasting
+### Pattern Playback Engine
+- Double-buffered LED output (no flicker)
+- 60 FPS update rate via hardware timer
+- Effect blending with crossfade
+- Parameter interpolation (smooth transitions)
+- Hot cache: 3-5 patterns in RAM for instant switching
 
-# User Experience
+### Template System
+- 15 patterns pre-loaded in flash
+- Categories: Ambient (5), Energy (5), Special (5)
+- One-click deployment via WebSocket
+- Template metadata: name, preview, parameters
 
-## User Personas
-- **Lighting Designer**: Needs reliable pattern upload/management and live control
-- **Installation Tech**: Requires simple discovery and robust error recovery
-- **Developer**: Wants clear API documentation and comprehensive error codes
+### Network Management
+- WiFi AP mode for initial setup
+- mDNS broadcasting ("prism-k1.local")
+- Captive portal for configuration
+- Credential storage in NVS
+- Auto-reconnect on disconnect
 
-## Key User Flows
-1. **Pattern Upload**: Client discovers device → uploads .prism file → receives confirmation
-2. **Live Control**: Connect WebSocket → send parameter updates → see immediate response
-3. **Playlist Management**: Upload patterns → create playlist → trigger sequential playback
-4. **System Recovery**: Power loss during upload → system boots → reconciles filesystem
-
-## UI/UX Considerations
-- Clear HTTP status codes matching REST conventions
-- Detailed error messages in JSON format
-- Progress updates for long operations
-- Atomic operations preventing partial states
-- Comprehensive logging via WebSocket
-</context>
-
-<PRD>
 # Technical Architecture
 
-## System Components
+## Hardware Constraints
+- MCU: ESP32-S3 (dual-core 240MHz)
+- RAM: 512KB total (300KB usable after system)
+- Flash: 8MB (6.5MB for firmware + storage)
+- LED Output: WS2812B protocol via RMT peripheral
+- Power: USB-C (5V 2A minimum)
 
-### Core Layer (prism_core)
-- **prism_fs**: LittleFS filesystem operations, index management, atomic commits
-- **prism_hash**: CRC32 (ROM functions) and SHA256 (mbedTLS) implementations
-- **prism_prismfile**: Binary file format parsing, TLV decoder, Heatshrink decompression
-- **prism_types**: Common data structures and type definitions
-- **prism_errors**: Comprehensive error code mappings
+## Firmware Modules
 
-### HTTP Layer (prism_http)
-- **prism_http**: HTTPS server, REST endpoint handlers, JSON responses
-- **prism_ws**: WebSocket handler, message routing, client management
+### Core Infrastructure (Week 1)
+- esp_system_init.c
+  - ESP-IDF v5.x initialization, partition table, NVS setup
+- memory_manager.c
+  - Custom allocator with fragmentation monitoring, heap statistics
+- error_handler.c
+  - Error codes, logging, graceful degradation
 
-### Execution Layer (prism_exec)
-- **prism_exec**: Pattern execution engine, timeline player, frame renderer
-- **prism_playlist**: Playlist management, sequential playback control
+### Communication Layer (Week 1)
+- websocket_handler.c
+  - Binary frame parsing, message queue, state machine
+- protocol_parser.c
+  - TLV decoding, CRC validation, command dispatch
+- network_manager.c
+  - WiFi lifecycle, mDNS, reconnection logic
 
-### Vendor Libraries
-- **heatshrink**: Compression library (embedded)
-- **cJSON**: JSON parsing (ESP-IDF component)
-- **mbedTLS**: Cryptographic functions (ESP-IDF)
+### Storage Layer (Week 2)
+- pattern_storage.c
+  - LittleFS operations, file management, space monitoring
+- pattern_format.c
+  - .prism format parser, header extraction, validation
+- cache_manager.c
+  - Hot cache implementation, LRU eviction, preloading
 
-## Data Models
+### Playback Engine (Week 2)
+- led_driver.c
+  - RMT peripheral control, double buffering, timing
+- effect_engine.c
+  - Pattern interpreter, parameter processing, transitions
+- animation_timer.c
+  - 60 FPS hardware timer, frame scheduling
 
-### Pattern Info Structure
+### Template System (Week 3)
+- template_loader.c
+  - Flash storage, metadata parsing, deployment
+- template_patterns.c
+  - 15 hardcoded patterns (Pulse, Wave, Sparkle, etc.)
+
+## Configuration Constants
+
+```c
+// Not 79 tokens - just what we need
+#define WS_BUFFER_SIZE      8192
+#define WS_TIMEOUT_MS       5000
+#define PATTERN_CACHE_SIZE  5
+#define LED_FPS            60
+#define LED_COUNT          150
+#define WIFI_RETRY_MAX     10
+#define STORAGE_PATH       "/littlefs"
+#define PATTERN_VERSION    0x01
+#define MAX_PATTERN_SIZE   204800  // 200KB
 ```
-- UUID (string): Unique identifier
-- Name (string): Human-readable name
-- Size (uint32): File size in bytes
-- SHA256 (string): Hex-encoded hash
-- UploadTime (timestamp): Upload timestamp
-- Duration (uint32): Pattern duration in ms
+
+## Message Protocol
+
+### WebSocket Binary Format
+```
+[TYPE:1][LENGTH:2][PAYLOAD:N][CRC:4]
+
+Types:
+0x10 - PUT_BEGIN {filename, size, crc}
+0x11 - PUT_DATA {offset, data}
+0x12 - PUT_END {success}
+0x20 - CONTROL {command, params}
+0x30 - STATUS {heap, patterns, uptime}
 ```
 
-### Playback Status
+### State Machine
 ```
-- State (enum): idle/playing/paused
-- CurrentPattern (UUID)
-- Position (uint32): Current position in ms
-- Loop (bool): Loop enable flag
-- Parameters (map): Live parameter values
-```
-
-### WebSocket Message Format
-```
-- Type (string): Command type
-- Payload (object): Command-specific data
-- Timestamp (uint32): Message timestamp
+IDLE -> RECEIVING -> VALIDATING -> STORING -> IDLE
+         ↓                ↓           ↓
+       ERROR           ERROR       ERROR
+         ↓                ↓           ↓
+       IDLE            IDLE        IDLE
 ```
 
-## APIs and Integrations
+# Acceptance & Quality Gates
 
-### REST Endpoints
-- POST /api/patterns - Upload new pattern
-- GET /api/patterns - List all patterns
-- DELETE /api/patterns/:id - Delete pattern
-- POST /api/play - Start playback
-- POST /api/playlist - Set playlist
-- GET /api/status - Get system status
+## Phase 1: Core Infrastructure (Days 1-3)
+- ESP-IDF project builds with CMake
+- Serial console shows boot messages
+- WiFi AP mode starts ("PRISM-SETUP")
+- Heap monitoring shows <50KB usage
+- WebSocket accepts connections
+- No heap fragmentation after 1000 connect/disconnect cycles
 
-### WebSocket Commands
-- set_param - Update live parameter
-- play/pause/stop - Playback control
-- get_status - Request status update
-- subscribe/unsubscribe - Event subscriptions
+## Phase 2: Communication Protocol (Days 4-5)
+- Binary messages parse correctly
+- PUT_BEGIN/DATA/END sequence works
+- File writes to LittleFS successfully
+- CRC validation catches corrupted data
+- Error codes return properly
+- 500KB/s sustained transfer rate
 
-### ESP-IDF Components
-- esp_https_server - HTTPS server
-- esp_http_server - WebSocket support
-- esp_littlefs - Filesystem (managed)
-- mbedtls - Cryptography
-- mdns - Service discovery
-- cJSON - JSON parsing
-- esp_timer - Timing functions
+## Phase 3: Storage System (Days 6-8)
+- LittleFS mounts and formats
+- Patterns save/load/delete
+- Hot cache switches <100ms
+- Structural efficiency: 40% size reduction
+- 25+ patterns fit in partition
+- No filesystem corruption after power cycle
 
-## Infrastructure Requirements
+## Phase 4: Playback Engine (Days 9-10)
+- LED output at stable 60 FPS
+- Pattern switching without flicker
+- Parameter changes apply smoothly
+- Memory usage stable during playback
+- CPU usage <50% during animation
 
-### Memory Allocation
-- Upload buffer: 2x4KB ping-pong buffers
-- WebSocket frame: 32KB maximum
-- Pattern file: 256KB maximum
-- Index cache: Dynamic (cJSON managed)
-- Execution buffer: 8KB for LED frames
-
-### Task Architecture
-- HTTP server task (ESP-IDF managed)
-- WebSocket pump task (4KB stack, priority 3)
-- Execution engine task (8KB stack, priority 5)
-- Index manager task (4KB stack, priority 2, ephemeral)
-
-### Partition Layout
-```
-nvs:      0x9000   (24KB)  - Non-volatile storage
-otadata:  0xF000   (8KB)   - OTA data
-app0:     0x11000  (1.5MB) - Primary application
-app1:     0x181000 (1.5MB) - OTA application
-prismfs:  0x2F1000 (1MB)   - LittleFS partition
-```
+## Phase 5: Template System (Days 11-12)
+- 15 templates accessible
+- One-click deployment works
+- Metadata displays correctly
+- Categories organize properly
+- Templates survive firmware updates
 
 # Development Roadmap
 
-## Phase 1: Foundation Infrastructure
-- ESP-IDF project setup with CMake configuration
-- Partition table implementation with LittleFS allocation
-- Core filesystem operations (mount, format, basic I/O)
-- Hash functions implementation (CRC32, SHA256)
-- Error code system and logging framework
-- Basic project structure with all components
+## Week 1: Foundation (Priority: CRITICAL)
+- TASK-01: Setup ESP-IDF v5.x project structure
+- TASK-02: Configure partition table (LittleFS 1.5MB)
+- TASK-03: Implement WebSocket server base
+- TASK-04: Create binary protocol parser
+- TASK-05: Add WiFi manager with AP mode
+- TASK-06: Implement heap monitoring
+- TASK-07: Create error handling system
+- TASK-08: Add mDNS broadcasting
 
-## Phase 2: HTTP Server Implementation
-- HTTPS server initialization with self-signed certificate
-- REST endpoint routing and handler registration
-- Status and pattern list endpoints
-- Upload streaming handler with multipart support
-- File validation and atomic storage operations
-- JSON response formatting and error handling
+## Week 2: Storage & Playback (Priority: HIGH)
+- TASK-09: Initialize LittleFS filesystem
+- TASK-10: Implement .prism format parser
+- TASK-11: Create pattern storage API
+- TASK-12: Build hot cache system
+- TASK-13: Setup RMT LED driver
+- TASK-14: Implement effect engine
+- TASK-15: Add animation timer
+- TASK-16: Create pattern transitions
 
-## Phase 3: WebSocket Integration
-- WebSocket endpoint registration and upgrade handling
-- Message parser and command router implementation
-- Client connection management with FreeRTOS queues
-- Event broadcasting system for multiple clients
-- Progress and status update notifications
-- Binary and text frame support
+## Week 3: Templates & Polish (Priority: HIGH)
+- TASK-17: Design 5 ambient templates
+- TASK-18: Design 5 energy templates
+- TASK-19: Design 5 special templates
+- TASK-20: Implement template loader
+- TASK-21: Add template metadata
+- TASK-22: Create deployment system
+- TASK-23: Optimize memory usage
+- TASK-24: Add performance profiling
 
-## Phase 4: Pattern File Support
-- .prism file header validation (magic bytes, version)
-- TLV record parser implementation
-- Manifest extraction and parsing
-- Heatshrink decompression integration
-- SHA256 integrity verification
-- Index management and reconciliation
+## Week 4: Testing & Optimization (Priority: MEDIUM)
+- TASK-25: Stress test WebSocket (24h run)
+- TASK-26: Test heap fragmentation
+- TASK-27: Validate pattern switching
+- TASK-28: Test WiFi reconnection
+- TASK-29: Profile power consumption
+- TASK-30: Create OTA update system
+- TASK-31: Document error codes
+- TASK-32: Final optimization pass
 
-## Phase 5: Execution Engine
-- Timeline-based pattern executor
-- Frame generation at 60 FPS
-- Curve interpolation algorithms
-- Palette color management
-- Live parameter modulation system
-- Playlist sequential playback
+# Reusable Module Structure
 
-## Phase 6: Testing and Hardening
-- Unit tests for hash functions with known vectors
-- Integration tests for REST API endpoints
-- WebSocket stress testing with rapid updates
-- Power-loss recovery validation
-- Memory leak detection and profiling
-- Performance optimization and benchmarking
+```
+firmware/
+├── core/
+│   ├── esp_system_init.c
+│   ├── memory_manager.c
+│   └── error_handler.c
+├── network/
+│   ├── websocket_handler.c
+│   ├── protocol_parser.c
+│   └── network_manager.c
+├── storage/
+│   ├── pattern_storage.c
+│   ├── pattern_format.c
+│   └── cache_manager.c
+├── playback/
+│   ├── led_driver.c
+│   ├── effect_engine.c
+│   └── animation_timer.c
+└── templates/
+    ├── template_loader.c
+    └── template_patterns.c
+```
 
-# Logical Dependency Chain
+# Critical Path Dependencies
 
-## Foundation First
-1. Project structure and CMake must be established before any components
-2. Partition table defines storage before filesystem initialization
-3. Error codes and types must exist before any functional code
-4. Logging system needed for all subsequent debugging
+1. ESP-IDF setup (TASK-01) blocks everything
+2. WebSocket (TASK-03) blocks protocol testing
+3. LittleFS (TASK-09) blocks storage features
+4. LED driver (TASK-13) blocks visual testing
+5. Hot cache (TASK-12) blocks performance targets
+6. Templates (TASK-17-19) block user experience
 
-## Core Before Features
-1. Filesystem operations required before any file handling
-2. Hash functions needed for integrity checks
-3. Binary format parser required for pattern support
-4. Basic HTTP server needed before REST endpoints
-
-## Integration Points
-1. WebSocket requires HTTP server to be running
-2. Execution engine needs pattern files to be parseable
-3. Playlist manager depends on execution engine
-4. Index reconciliation requires filesystem and hash functions
-
-## Testing Dependencies
-1. Unit tests can begin after individual modules complete
-2. Integration tests require full REST API implementation
-3. Stress tests need WebSocket and execution engine
-4. Recovery tests require complete upload pipeline
+Parallel work possible:
+- Network team: TASK-03,04,05,08
+- Storage team: TASK-09,10,11,12
+- Playback team: TASK-13,14,15,16
 
 # Risks and Mitigations
 
-## Technical Challenges
+- **Heap fragmentation kills device after hours**
+  - Mitigation: Fixed-size allocations, memory pools, monitoring
 
-### Flash Wear Leveling
-- Risk: Frequent uploads could wear flash prematurely
-- Mitigation: LittleFS provides built-in wear leveling; implement upload rate limiting
+- **WebSocket drops during large transfers**
+  - Mitigation: Chunked transfers, resume capability, CRC checks
 
-### Memory Fragmentation
-- Risk: Dynamic allocations could fragment heap
-- Mitigation: Use static buffers where possible; implement memory pools for dynamic needs
+- **Pattern switching causes visible glitch**
+  - Mitigation: Double buffering, crossfade, preload next
 
-### Concurrent Access
-- Risk: Race conditions between HTTP uploads and execution
-- Mitigation: Use FreeRTOS mutexes; implement clear ownership model
+- **Templates too large for flash**
+  - Mitigation: Structural optimization, shared palettes
 
-### Network Security
-- Risk: Self-signed certificates trigger browser warnings
-- Mitigation: Document certificate installation process; consider certificate provisioning
+- **WiFi reconnect storms router**
+  - Mitigation: Exponential backoff, max retry limit
 
-## Resource Constraints
+# Definition of Done
 
-### Flash Storage Limitations
-- Risk: 1MB partition fills quickly with patterns
-- Mitigation: Implement storage quotas; provide clear space monitoring
+## Per Module
+- Compiles without warnings
+- Memory leaks checked with heap_caps_check_integrity()
+- Error paths tested
+- Serial debug output clear
+- Header documentation complete
 
-### RAM Constraints
-- Risk: Large patterns could exhaust RAM during decompression
-- Mitigation: Stream processing where possible; chunk-based decompression
+## Per Feature
+- Functional requirement met
+- Performance target achieved
+- Memory budget maintained
+- Error handling robust
+- Integration test passes
 
-### CPU Performance
-- Risk: 60 FPS generation could impact network responsiveness
-- Mitigation: Priority-based task scheduling; optimize hot paths
-
-## Reliability Concerns
-
-### Power Loss During Upload
-- Risk: Corrupted filesystem or partial files
-- Mitigation: Atomic rename operations; filesystem reconciliation on boot
-
-### Network Interruptions
-- Risk: Incomplete uploads or lost WebSocket connections
-- Mitigation: Upload resumption support; automatic WebSocket reconnection
-
-### Pattern Corruption
-- Risk: Bad data could crash execution engine
-- Mitigation: Comprehensive validation; safe parsing with bounds checks
+## Overall Project
+- 15 templates working
+- <100ms pattern switch
+- 60 FPS LED output stable
+- <150KB heap usage
+- Zero heap fragmentation (24h test)
+- WebSocket reliable
+- OTA update functional
+- 25+ patterns fit in storage
 
 # Appendix
 
-## Reference Specifications
+## Reference Implementation
+- ESP-IDF Examples: protocols/websocket
+- LittleFS Port: joltwallet/esp_littlefs
+- LED Driver: FastLED-idf
 
-### Binary .prism File Format
-```
-Header (64 bytes):
-  - Magic: "PRISM\x00\x00\x00" (8 bytes)
-  - Version: uint32
-  - Flags: uint32
-  - DataSize: uint32
-  - CompressedSize: uint32
-  - CRC32: uint32
-  - Reserved: (32 bytes)
+## Testing Hardware
+- ESP32-S3-DevKitC-1
+- WS2812B LED strip (150 pixels)
+- USB power meter
+- WiFi 6 router for testing
 
-TLV Records:
-  - Type: uint16
-  - Length: uint32
-  - Value: variable
-
-Record Types:
-  - 0x0001: Manifest (JSON)
-  - 0x0002: Timeline (binary)
-  - 0x0003: Curves (binary)
-  - 0x0004: Palette (binary)
-  - 0x0005: Compressed data
-```
-
-### Error Code Mappings
-```
-PRISM_OK (0) → 200 OK
-PRISM_ERR_BAD_REQUEST (1) → 400 Bad Request
-PRISM_ERR_EXISTS (2) → 409 Conflict
-PRISM_ERR_NOT_FOUND (3) → 404 Not Found
-PRISM_ERR_TOO_LARGE (4) → 413 Payload Too Large
-PRISM_ERR_INTEGRITY (5) → 422 Unprocessable Entity
-PRISM_ERR_FORMAT (6) → 422 Unprocessable Entity
-PRISM_ERR_NO_SPACE (7) → 507 Insufficient Storage
-PRISM_ERR_RATE_LIMIT (8) → 429 Too Many Requests
-PRISM_ERR_INTERNAL (9) → 500 Internal Server Error
-PRISM_ERR_TIMEOUT (10) → 408 Request Timeout
-PRISM_ERR_NO_MEMORY (11) → 503 Service Unavailable
-```
-
-### Performance Targets
-- Upload throughput: >500KB/s on LAN
-- Play command latency: <100ms
-- WebSocket parameter updates: 30Hz sustained
-- LED frame generation: 60 FPS (16.67ms/frame)
-- Boot to ready: <3 seconds
-- Pattern switch time: <50ms
-
-### Security Considerations
-- HTTPS only (no HTTP fallback)
-- SHA256 verification for all uploads
-- Rate limiting: 10 requests/minute for uploads
-- Maximum concurrent uploads: 2
-- WebSocket frame size limit: 32KB
-- Total pattern size limit: 256KB
-
-### Testing Checklist
-- [ ] CRC32/SHA256 with NIST test vectors
-- [ ] TLV parser with malformed inputs
-- [ ] Upload with power loss at 50%
-- [ ] 100 rapid sequential uploads
-- [ ] WebSocket with 10 concurrent clients
-- [ ] Memory usage under 180KB
-- [ ] CPU usage under 70% during playback
-- [ ] Filesystem recovery after corruption
-</PRD>
+## Success Metrics
+- Time to first LED: <60 seconds
+- Pattern switch latency: <100ms
+- Template deployment: <2 seconds
+- Memory stability: 24 hours
+- WebSocket throughput: 500KB/s
