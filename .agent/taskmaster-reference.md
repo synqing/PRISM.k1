@@ -1,9 +1,3 @@
----
-description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
-globs: **/*
-alwaysApply: true
----
-
 # Taskmaster Tool & Command Reference
 
 This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
@@ -12,7 +6,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 
 **Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
 
-**🏷️ Tagged Task Lists System:** Task Master now supports **tagged task lists** for multi-context task management. This allows you to maintain separate, isolated lists of tasks for different features, branches, or experiments. Existing projects are seamlessly migrated to use a default "master" tag. Most commands now support a `--tag <name>` flag to specify which context to operate on. If omitted, commands use the currently active tag.
+**🏷️ Tagged Task Lists System:** Task Master now supports **tagged task lists** for multi-context task management. This allows you to maintain separate, isolated lists of tasks for different features, branches, or experiments. Existing projects are seamlessly migrated to use a default "master" tag. Most commands now support a `--tag <n>` flag to specify which context to operate on. If omitted, commands use the currently active tag.
 
 ---
 
@@ -24,14 +18,14 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **CLI Command:** `task-master init [options]`
 *   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
 *   **Key CLI Options:**
-    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
+    *   `--name <n>`: `Set the name for your project in Taskmaster's configuration.`
     *   `--description <text>`: `Provide a brief description for your project.`
     *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
     *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
 *   **Usage:** Run this once at the beginning of a new project.
 *   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
 *   **Key MCP Parameters/Options:**
-    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
+    *   `projectName`: `Set the name for your project.` (CLI: `--name <n>`)
     *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
     *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
     *   `authorName`: `Author name.` (CLI: `--author <author>`)
@@ -99,7 +93,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Key Parameters/Options:**
     *   `status`: `Show only Taskmaster tasks matching this status (or multiple statuses, comma-separated), e.g., 'pending' or 'done,in-progress'.` (CLI: `-s, --status <status>`)
     *   `withSubtasks`: `Include subtasks indented under their parent tasks in the list.` (CLI: `--with-subtasks`)
-    *   `tag`: `Specify which tag context to list tasks from. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to list tasks from. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Get an overview of the project status, often used at the start of a work session.
 
@@ -110,7 +104,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Description:** `Ask Taskmaster to show the next available task you can work on, based on status and completed dependencies.`
 *   **Key Parameters/Options:**
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
-    *   `tag`: `Specify which tag context to use. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to use. Defaults to the current active tag.` (CLI: `--tag <n>`)
 *   **Usage:** Identify what to work on next according to the plan.
 
 ### 5. Get Task Details (`get_task`)
@@ -120,7 +114,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Description:** `Display detailed information for one or more specific Taskmaster tasks or subtasks by ID.`
 *   **Key Parameters/Options:**
     *   `id`: `Required. The ID of the Taskmaster task (e.g., '15'), subtask (e.g., '15.2'), or a comma-separated list of IDs ('1,5,10.2') you want to view.` (CLI: `[id]` positional or `-i, --id <id>`)
-    *   `tag`: `Specify which tag context to get the task(s) from. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to get the task(s) from. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Understand the full details for a specific task. When multiple IDs are provided, a summary table is shown.
 *   **CRITICAL INFORMATION** If you need to collect information from multiple tasks, use comma-separated IDs (i.e. 1,2,3) to receive an array of tasks. Do not needlessly get tasks one at a time if you need to get many as that is wasteful.
@@ -139,7 +133,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `dependencies`: `Specify the IDs of any Taskmaster tasks that must be completed before this new one can start, e.g., '12,14'.` (CLI: `-d, --dependencies <ids>`)
     *   `priority`: `Set the priority for the new task: 'high', 'medium', or 'low'. Default is 'medium'.` (CLI: `--priority <priority>`)
     *   `research`: `Enable Taskmaster to use the research role for potentially more informed task creation.` (CLI: `-r, --research`)
-    *   `tag`: `Specify which tag context to add the task to. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to add the task to. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Quickly add newly identified tasks during development.
 *   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress.
@@ -158,7 +152,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `dependencies`: `Specify IDs of other tasks or subtasks, e.g., '15' or '16.1', that must be done before this new subtask.` (CLI: `--dependencies <ids>`)
     *   `status`: `Set the initial status for the new subtask. Default is 'pending'.` (CLI: `-s, --status <status>`)
     *   `generate`: `Enable Taskmaster to regenerate markdown task files after adding the subtask.` (CLI: `--generate`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Break down tasks manually or reorganize existing tasks.
 
@@ -171,7 +165,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `from`: `Required. The ID of the first task Taskmaster should update. All tasks with this ID or higher that are not 'done' will be considered.` (CLI: `--from <id>`)
     *   `prompt`: `Required. Explain the change or new context for Taskmaster to apply to the tasks, e.g., "We are now using React Query instead of Redux Toolkit for data fetching".` (CLI: `-p, --prompt <text>`)
     *   `research`: `Enable Taskmaster to use the research role for more informed updates. Requires appropriate API key.` (CLI: `-r, --research`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Handle significant implementation changes or pivots that affect multiple future tasks. Example CLI: `task-master update --from='18' --prompt='Switching to React Query.\nNeed to refactor data fetching...'`
 *   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress.
@@ -186,7 +180,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `prompt`: `Required. Explain the specific changes or provide the new information Taskmaster should incorporate into this task.` (CLI: `-p, --prompt <text>`)
     *   `append`: `If true, appends the prompt content to the task's details with a timestamp, rather than replacing them. Behaves like update-subtask.` (CLI: `--append`)
     *   `research`: `Enable Taskmaster to use the research role for more informed updates. Requires appropriate API key.` (CLI: `-r, --research`)
-    *   `tag`: `Specify which tag context the task belongs to. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context the task belongs to. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Refine a specific task based on new understanding. Use `--append` to log progress without creating subtasks.
 *   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress.
@@ -200,7 +194,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `id`: `Required. The ID of the Taskmaster subtask, e.g., '5.2', to update with new information.` (CLI: `-i, --id <id>`)
     *   `prompt`: `Required. The information, findings, or progress notes to append to the subtask's details with a timestamp.` (CLI: `-p, --prompt <text>`)
     *   `research`: `Enable Taskmaster to use the research role for more informed updates. Requires appropriate API key.` (CLI: `-r, --research`)
-    *   `tag`: `Specify which tag context the subtask belongs to. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context the subtask belongs to. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Log implementation progress, findings, and discoveries during subtask development. Each update is timestamped and appended to preserve the implementation journey.
 *   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress.
@@ -213,7 +207,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Key Parameters/Options:**
     *   `id`: `Required. The ID(s) of the Taskmaster task(s) or subtask(s), e.g., '15', '15.2', or '16,17.1', to update.` (CLI: `-i, --id <id>`)
     *   `status`: `Required. The new status to set, e.g., 'done', 'pending', 'in-progress', 'review', 'cancelled'.` (CLI: `-s, --status <status>`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Mark progress as tasks move through the development cycle.
 
@@ -225,7 +219,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Key Parameters/Options:**
     *   `id`: `Required. The ID of the Taskmaster task, e.g., '5', or subtask, e.g., '5.2', to permanently remove.` (CLI: `-i, --id <id>`)
     *   `yes`: `Skip the confirmation prompt and immediately delete the task.` (CLI: `-y, --yes`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Permanently delete tasks or subtasks that are no longer needed in the project.
 *   **Notes:** Use with caution as this operation cannot be undone. Consider using 'blocked', 'cancelled', or 'deferred' status instead if you just want to exclude a task from active planning but keep it for reference. The command automatically cleans up dependency references in other tasks.
@@ -245,7 +239,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `research`: `Enable Taskmaster to use the research role for more informed subtask generation. Requires appropriate API key.` (CLI: `-r, --research`)
     *   `prompt`: `Optional: Provide extra context or specific instructions to Taskmaster for generating the subtasks.` (CLI: `-p, --prompt <text>`)
     *   `force`: `Optional: If true, clear existing subtasks before generating new ones. Default is false (append).` (CLI: `--force`)
-    *   `tag`: `Specify which tag context the task belongs to. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context the task belongs to. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Generate a detailed implementation plan for a complex task before starting coding. Automatically uses complexity report recommendations if available and `num` is not specified.
 *   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress.
@@ -260,7 +254,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `research`: `Enable research role for more informed subtask generation. Requires appropriate API key.` (CLI: `-r, --research`)
     *   `prompt`: `Optional: Provide extra context for Taskmaster to apply generally during expansion.` (CLI: `-p, --prompt <text>`)
     *   `force`: `Optional: If true, clear existing subtasks before generating new ones for each eligible task. Default is false (append).` (CLI: `--force`)
-    *   `tag`: `Specify which tag context to expand. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to expand. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Useful after initial task generation or complexity analysis to break down multiple tasks at once.
 *   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress.
@@ -273,7 +267,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Key Parameters/Options:**
     *   `id`: `The ID(s) of the Taskmaster parent task(s) whose subtasks you want to remove, e.g., '15' or '16,18'. Required unless using 'all'.` (CLI: `-i, --id <ids>`)
     *   `all`: `Tell Taskmaster to remove subtasks from all parent tasks.` (CLI: `--all`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Used before regenerating subtasks with `expand_task` if the previous breakdown needs replacement.
 
@@ -286,7 +280,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `id`: `Required. The ID(s) of the Taskmaster subtask(s) to remove, e.g., '15.2' or '16.1,16.3'.` (CLI: `-i, --id <id>`)
     *   `convert`: `If used, Taskmaster will turn the subtask into a regular top-level task instead of deleting it.` (CLI: `-c, --convert`)
     *   `generate`: `Enable Taskmaster to regenerate markdown task files after removing the subtask.` (CLI: `--generate`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Delete unnecessary subtasks or promote a subtask to a top-level task.
 
@@ -298,7 +292,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Key Parameters/Options:**
     *   `from`: `Required. ID of the task/subtask to move (e.g., "5" or "5.2"). Can be comma-separated for multiple tasks.` (CLI: `--from <id>`)
     *   `to`: `Required. ID of the destination (e.g., "7" or "7.3"). Must match the number of source IDs if comma-separated.` (CLI: `--to <id>`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Reorganize tasks by moving them within the hierarchy. Supports various scenarios like:
     *   Moving a task to become a subtask
@@ -328,7 +322,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Key Parameters/Options:**
     *   `id`: `Required. The ID of the Taskmaster task that will depend on another.` (CLI: `-i, --id <id>`)
     *   `dependsOn`: `Required. The ID of the Taskmaster task that must be completed first, the prerequisite.` (CLI: `-d, --depends-on <id>`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <path>`)
 *   **Usage:** Establish the correct order of execution between tasks.
 
@@ -340,7 +334,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Key Parameters/Options:**
     *   `id`: `Required. The ID of the Taskmaster task you want to remove a prerequisite from.` (CLI: `-i, --id <id>`)
     *   `dependsOn`: `Required. The ID of the Taskmaster task that should no longer be a prerequisite.` (CLI: `-d, --depends-on <id>`)
-    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to operate on. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Update task relationships when the order of execution changes.
 
@@ -350,7 +344,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **CLI Command:** `task-master validate-dependencies [options]`
 *   **Description:** `Check your Taskmaster tasks for dependency issues (like circular references or links to non-existent tasks) without making changes.`
 *   **Key Parameters/Options:**
-    *   `tag`: `Specify which tag context to validate. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to validate. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Audit the integrity of your task dependencies.
 
@@ -360,7 +354,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **CLI Command:** `task-master fix-dependencies [options]`
 *   **Description:** `Automatically fix dependency issues (like circular references or links to non-existent tasks) in your Taskmaster tasks.`
 *   **Key Parameters/Options:**
-    *   `tag`: `Specify which tag context to fix dependencies in. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to fix dependencies in. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Clean up dependency errors automatically.
 
@@ -377,7 +371,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `output`: `Where to save the complexity analysis report. Default is '.taskmaster/reports/task-complexity-report.json' (or '..._tagname.json' if a tag is used).` (CLI: `-o, --output <file>`)
     *   `threshold`: `The minimum complexity score (1-10) that should trigger a recommendation to expand a task.` (CLI: `-t, --threshold <number>`)
     *   `research`: `Enable research role for more accurate complexity analysis. Requires appropriate API key.` (CLI: `-r, --research`)
-    *   `tag`: `Specify which tag context to analyze. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to analyze. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Used before breaking down tasks to identify which ones need the most attention.
 *   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress.
@@ -388,7 +382,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **CLI Command:** `task-master complexity-report [options]`
 *   **Description:** `Display the task complexity analysis report in a readable format.`
 *   **Key Parameters/Options:**
-    *   `tag`: `Specify which tag context to show the report for. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to show the report for. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to the complexity report (default: '.taskmaster/reports/task-complexity-report.json').` (CLI: `-f, --file <file>`)
 *   **Usage:** Review and understand the complexity analysis results after running analyze-complexity.
 
@@ -403,7 +397,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
 *   **Description:** `Create or update individual Markdown files for each task based on your tasks.json.`
 *   **Key Parameters/Options:**
     *   `output`: `The directory where Taskmaster should save the task files (default: in a 'tasks' directory).` (CLI: `-o, --output <directory>`)
-    *   `tag`: `Specify which tag context to generate files for. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to generate files for. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `file`: `Path to your Taskmaster 'tasks.json' file. Default relies on auto-detection.` (CLI: `-f, --file <file>`)
 *   **Usage:** Run this after making changes to tasks.json to keep individual task files up to date. This command is now manual and no longer runs automatically.
 
@@ -426,7 +420,7 @@ This document provides a detailed reference for interacting with Taskmaster, cov
     *   `saveTo`: `Task or subtask ID (e.g., "15", "15.2") to automatically save the research conversation to.` (CLI: `--save-to <id>`)
     *   `saveFile`: `If true, saves the research conversation to a markdown file in '.taskmaster/docs/research/'.` (CLI: `--save-file`)
     *   `noFollowup`: `Disables the interactive follow-up question menu in the CLI.` (CLI: `--no-followup`)
-    *   `tag`: `Specify which tag context to use for task-based context gathering. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to use for task-based context gathering. Defaults to the current active tag.` (CLI: `--tag <n>`)
     *   `projectRoot`: `The directory of the project. Must be an absolute path.` (CLI: Determined automatically)
 *   **Usage:** **This is a POWERFUL tool that agents should use FREQUENTLY** to:
     *   Get fresh information beyond knowledge cutoff dates
@@ -527,7 +521,7 @@ This new suite of commands allows you to manage different task contexts (tags).
 *   **Key Parameters/Options:**
     *   `status`: `Filter tasks by status (e.g., 'pending', 'done').` (CLI: `-s, --status <status>`)
     *   `withSubtasks`: `Include subtasks in the export.` (CLI: `--with-subtasks`)
-    *   `tag`: `Specify which tag context to export from. Defaults to the current active tag.` (CLI: `--tag <name>`)
+    *   `tag`: `Specify which tag context to export from. Defaults to the current active tag.` (CLI: `--tag <n>`)
 
 ---
 
@@ -555,4 +549,4 @@ Environment variables are used **only** for sensitive API keys related to AI pro
 
 ---
 
-For details on how these commands fit into the development process, see the [dev_workflow.mdc](mdc:.cursor/rules/taskmaster/dev_workflow.mdc).
+For details on how these commands fit into the development process, see `.agent/cursor-workflow.md`.

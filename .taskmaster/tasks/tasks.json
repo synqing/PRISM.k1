@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": "1",
+        "id": 1,
         "title": "Initialize ESP-IDF v5.x project structure",
         "description": "Set up the complete ESP-IDF project with CMake configuration, component structure, and build system",
         "details": "Create root CMakeLists.txt with include($ENV{IDF_PATH}/tools/cmake/project.cmake), set up main component with entry point, configure sdkconfig.defaults with CONFIG_FREERTOS_HZ=1000, CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192. Create idf_component.yml for dependency management.",
@@ -14,7 +14,7 @@
         "subtasks": []
       },
       {
-        "id": "2",
+        "id": 2,
         "title": "Configure partition table with LittleFS",
         "description": "Create custom partition table with dedicated LittleFS partition for pattern storage",
         "details": "Create partitions.csv with: nvs (0x9000, 24KB), otadata (0xF000, 8KB), app0 (0x11000, 1.5MB), app1 (0x181000, 1.5MB), prismfs data 0x82 (0x2F1000, 1MB). Set CONFIG_PARTITION_TABLE_CUSTOM=y in sdkconfig.defaults.",
@@ -28,7 +28,7 @@
         "updatedAt": "2025-10-15T01:55:17.454Z"
       },
       {
-        "id": "3",
+        "id": 3,
         "title": "Add LittleFS managed component",
         "description": "Integrate joltwallet/littlefs as managed component using ESP-IDF Component Manager",
         "details": "Add to idf_component.yml: dependencies: joltwallet/littlefs: '^1.20.1'. Run idf.py reconfigure to fetch component. Verify component downloaded to managed_components directory.",
@@ -37,11 +37,12 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2025-10-15T01:55:47.291Z"
       },
       {
-        "id": "4",
+        "id": 4,
         "title": "Implement core filesystem operations (prism_fs)",
         "description": "Create filesystem abstraction layer with LittleFS mounting, atomic operations, and index management",
         "details": "Implement prism_fs_init() with esp_vfs_littlefs_register(), format_if_mount_failed=true. Create atomic commit pattern: write to .tmp file, fsync, rename. Implement index operations using cJSON for metadata storage at /prism/.index.json.",
@@ -55,7 +56,7 @@
         "subtasks": []
       },
       {
-        "id": "5",
+        "id": 5,
         "title": "Implement hash functions (prism_hash)",
         "description": "Create CRC32 and SHA256 implementations using ESP32 ROM functions and mbedTLS",
         "details": "CRC32: Use esp_rom_crc32_le() from ROM. SHA256: Use mbedtls_sha256_context with proper init/update/finish pattern. Create hex conversion utility. Add streaming hash support for large files.",
@@ -68,7 +69,7 @@
         "subtasks": []
       },
       {
-        "id": "6",
+        "id": 6,
         "title": "Create error code system (prism_errors)",
         "description": "Define comprehensive error codes with HTTP status mapping",
         "details": "Define prism_error_t enum with PRISM_OK, PRISM_ERR_BAD_REQUEST, etc. Create error_to_http_status() mapping function. Use ESP_ERROR_CHECK_WITHOUT_ABORT for non-critical errors.",
@@ -81,7 +82,7 @@
         "subtasks": []
       },
       {
-        "id": "7",
+        "id": 7,
         "title": "Implement binary file format parser for .prism files",
         "description": "Create .prism file header validation and TLV record parser with bounds checking for the .prism format",
         "details": "Validate .prism format magic bytes 'PRISM\\x00\\x00\\x00', version check, CRC32 header verification. Implement safe TLV parser with: bounds checking, maximum length validation, safe memory allocation. Support record types 0x0001-0x0005. This handles the .prism format (device runtime format), not the .k1p legacy format.",
@@ -95,7 +96,7 @@
         "subtasks": []
       },
       {
-        "id": "8",
+        "id": 8,
         "title": "Implement structural efficiency optimizations",
         "description": "Optimize .prism format size through structural efficiency: shared palettes, delta encoding, and hot cache",
         "details": "Focus on structure-first approach rather than algorithm compression. Implement: (1) Shared palette system - reuse color palettes across patterns to reduce duplication, (2) Delta encoding for timeline keyframes - store differences between frames instead of absolute values, (3) Hot cache for frequently used patterns - keep popular patterns in RAM. Consider Heatshrink/gzip compression as optional later enhancement, not primary strategy. Target: reduce typical pattern size by 40-60% through structural efficiency alone.",
@@ -108,7 +109,7 @@
         "subtasks": []
       },
       {
-        "id": "9",
+        "id": 9,
         "title": "Generate self-signed certificate for HTTPS",
         "description": "Create and embed self-signed certificate for HTTPS server",
         "details": "Generate 2048-bit RSA certificate with: openssl req -x509 -newkey rsa:2048 -keyout server_key.pem -out server_cert.pem -days 365 -nodes. Embed as string literals in prism_http.c. Consider future certificate provisioning mechanism.",
@@ -121,7 +122,7 @@
         "subtasks": []
       },
       {
-        "id": "10",
+        "id": 10,
         "title": "Initialize HTTPS server (prism_http)",
         "description": "Set up esp_https_server with embedded certificate and basic configuration",
         "details": "Use httpd_ssl_config_t with HTTPD_SSL_CONFIG_DEFAULT(), set server_cert and server_key from embedded strings. Configure max_uri_handlers=20, max_open_sockets=7, stack_size=8192. Start server on port 443.",
@@ -134,7 +135,7 @@
         "subtasks": []
       },
       {
-        "id": "11",
+        "id": 11,
         "title": "Implement REST endpoint routing",
         "description": "Create URI handlers for all REST endpoints with proper HTTP methods",
         "details": "Register handlers: POST /api/patterns (upload), GET /api/patterns (list), DELETE /api/patterns/:id (delete), POST /api/play (play), POST /api/playlist (playlist), GET /api/status (status). Use httpd_register_uri_handler() for each.",
@@ -147,7 +148,7 @@
         "subtasks": []
       },
       {
-        "id": "12",
+        "id": 12,
         "title": "Implement streaming upload handler",
         "description": "Create multipart upload handler with progress tracking and SHA256 verification",
         "details": "Use httpd_req_recv() in chunks of 4KB. Write to temporary file in /prism/.upload/. Calculate SHA256 during upload. Verify against X-PRISM-SHA256 header. Atomic rename on success. Send progress via WebSocket if connected.",
@@ -162,7 +163,7 @@
         "subtasks": []
       },
       {
-        "id": "13",
+        "id": 13,
         "title": "Implement pattern list endpoint",
         "description": "Create GET /api/patterns handler that returns JSON array of stored patterns",
         "details": "Read /prism/.index.json, parse with cJSON, build response array with: uuid, name, size, uploadTime, duration. Set Content-Type: application/json. Handle empty index gracefully.",
@@ -176,7 +177,7 @@
         "subtasks": []
       },
       {
-        "id": "14",
+        "id": 14,
         "title": "Implement pattern delete endpoint",
         "description": "Create DELETE handler with index cleanup",
         "details": "Parse UUID from URI path. Check file exists. Delete file with prism_fs_delete(). Update index to remove entry. Return 404 if not found, 200 on success.",
@@ -190,7 +191,7 @@
         "subtasks": []
       },
       {
-        "id": "15",
+        "id": 15,
         "title": "Add WebSocket endpoint (prism_ws)",
         "description": "Register WebSocket handler at /ws with upgrade support",
         "details": "Handle HTTP_GET for handshake with httpd_ws_respond_server_handshake(). Implement frame receiving with httpd_ws_recv_frame(). Support both text and binary frames. Maintain client connection list.",
@@ -203,7 +204,7 @@
         "subtasks": []
       },
       {
-        "id": "16",
+        "id": 16,
         "title": "Implement WebSocket message parser",
         "description": "Create JSON message parser and command router for WebSocket",
         "details": "Parse incoming JSON with cJSON. Route by 'type' field: set_param, play, pause, stop, get_status, subscribe. Validate message format. Send error responses for invalid messages.",
@@ -216,7 +217,7 @@
         "subtasks": []
       },
       {
-        "id": "17",
+        "id": 17,
         "title": "Implement WebSocket client management",
         "description": "Track connected clients and enable broadcasting",
         "details": "Maintain array of client file descriptors (max 5). Add clients on connection, remove on disconnect. Implement broadcast function for events. Use httpd_ws_send_frame_async() for non-blocking sends.",
@@ -230,7 +231,7 @@
         "subtasks": []
       },
       {
-        "id": "18",
+        "id": 18,
         "title": "Create execution engine task (prism_exec)",
         "description": "Implement FreeRTOS task for pattern execution with command queue",
         "details": "Create task with 8KB stack, priority tskIDLE_PRIORITY+5. Implement command queue (depth 16) for play/pause/stop commands. Main loop: check queue, update timeline, generate frame, output to LEDs at 60 FPS.",
@@ -243,7 +244,7 @@
         "subtasks": []
       },
       {
-        "id": "19",
+        "id": 19,
         "title": "Implement timeline player",
         "description": "Create timeline-based pattern playback system",
         "details": "Track current position in milliseconds using esp_timer_get_time(). Interpolate between keyframes. Support looping with seamless wraparound. Calculate frame data for current timestamp.",
@@ -256,7 +257,7 @@
         "subtasks": []
       },
       {
-        "id": "20",
+        "id": 20,
         "title": "Implement curve interpolation",
         "description": "Add smooth interpolation between pattern keyframes",
         "details": "Support linear, ease-in, ease-out, ease-in-out curves. Use fixed-point math for efficiency. Implement cubic bezier for smooth transitions. Cache calculated values where possible.",
@@ -269,7 +270,7 @@
         "subtasks": []
       },
       {
-        "id": "21",
+        "id": 21,
         "title": "Implement palette manager",
         "description": "Create color palette system for pattern rendering",
         "details": "Load palette from pattern file TLV record. Support up to 256 colors. Implement HSV to RGB conversion. Add color mixing and blending functions.",
@@ -283,7 +284,7 @@
         "subtasks": []
       },
       {
-        "id": "22",
+        "id": 22,
         "title": "Implement live parameter system",
         "description": "Add real-time parameter modulation via WebSocket",
         "details": "Support parameters: intensity, speed, hue_shift, saturation. Store in shared structure with mutex protection. Apply modulation during frame generation. Send updates to execution engine via queue.",
@@ -297,7 +298,7 @@
         "subtasks": []
       },
       {
-        "id": "23",
+        "id": 23,
         "title": "Implement playlist manager (prism_playlist)",
         "description": "Create sequential playlist playback system",
         "details": "Store playlist as array of UUIDs. Track current index. Implement next/previous navigation. Auto-advance on pattern completion. Support shuffle and repeat modes.",
@@ -311,7 +312,7 @@
         "subtasks": []
       },
       {
-        "id": "24",
+        "id": 24,
         "title": "Implement play command endpoint",
         "description": "Create POST /api/play handler for pattern playback",
         "details": "Parse JSON body for uuid, start_ms, loop parameters. Send command to execution engine via queue. Return immediate response. Update playback status.",
@@ -325,7 +326,7 @@
         "subtasks": []
       },
       {
-        "id": "25",
+        "id": 25,
         "title": "Implement status endpoint",
         "description": "Create GET /api/status with comprehensive system information",
         "details": "Return JSON with: playback state, current pattern, position, loop status, live parameters, storage usage, system uptime. Calculate storage from esp_littlefs_info().",
@@ -340,7 +341,7 @@
         "subtasks": []
       },
       {
-        "id": "26",
+        "id": 26,
         "title": "Add mDNS service discovery",
         "description": "Implement zero-configuration discovery with mDNS",
         "details": "Initialize mDNS with mdns_init(). Set hostname 'prism-k1'. Advertise _https._tcp service on port 443. Add TXT records with version, capabilities.",
@@ -353,7 +354,7 @@
         "subtasks": []
       },
       {
-        "id": "27",
+        "id": 27,
         "title": "Implement rate limiting",
         "description": "Add upload rate limiting to prevent abuse",
         "details": "Track requests per IP using hash table. Limit to 10 uploads per minute. Return 429 Too Many Requests when exceeded. Reset counters every minute using timer.",
@@ -366,7 +367,7 @@
         "subtasks": []
       },
       {
-        "id": "28",
+        "id": 28,
         "title": "Implement concurrent upload limit",
         "description": "Restrict simultaneous uploads to prevent resource exhaustion",
         "details": "Use semaphore with count of 2. Take semaphore at upload start, release on completion/error. Return 503 Service Unavailable when limit reached.",
@@ -379,7 +380,7 @@
         "subtasks": []
       },
       {
-        "id": "29",
+        "id": 29,
         "title": "Add filesystem reconciliation",
         "description": "Implement index rebuild on boot to handle corruption",
         "details": "On startup, scan /prism directory for .prism files. For each file: validate header, extract metadata, rebuild index entry. Remove orphaned temp files from .upload directory.",
@@ -393,7 +394,7 @@
         "subtasks": []
       },
       {
-        "id": "30",
+        "id": 30,
         "title": "Implement power-loss recovery",
         "description": "Add mechanisms to handle power loss during operations",
         "details": "Use journaling for critical operations. Implement two-phase commit for uploads. Add recovery markers in NVS. Clean incomplete operations on boot.",
@@ -407,7 +408,7 @@
         "subtasks": []
       },
       {
-        "id": "31",
+        "id": 31,
         "title": "Create unit tests for core modules",
         "description": "Comprehensive unit tests for hash, TLV parser, and filesystem",
         "details": "Test CRC32/SHA256 with NIST vectors. Test TLV parser with malformed data. Test filesystem atomic operations. Use Unity test framework. Run on host with ESP-IDF simulator.",
@@ -422,7 +423,7 @@
         "subtasks": []
       },
       {
-        "id": "32",
+        "id": 32,
         "title": "Create integration tests",
         "description": "End-to-end tests for upload, playback, and WebSocket flows",
         "details": "Write shell scripts using curl and wscat. Test full upload flow with verification. Test pattern playback via API. Test WebSocket parameter updates. Include negative test cases.",
@@ -437,7 +438,7 @@
         "subtasks": []
       },
       {
-        "id": "33",
+        "id": 33,
         "title": "Implement memory profiling",
         "description": "Add heap monitoring and leak detection",
         "details": "Use esp_get_free_heap_size() monitoring. Track heap before/after operations. Use heap_caps_check_integrity_all() for corruption detection. Log warnings when heap drops below threshold.",
@@ -451,7 +452,7 @@
         "subtasks": []
       },
       {
-        "id": "34",
+        "id": 34,
         "title": "Performance optimization",
         "description": "Optimize hot paths and critical sections",
         "details": "Profile with esp_timer functions. Optimize frame generation loop. Use DMA for LED output. Cache frequently accessed data. Reduce memory allocations in hot paths.",
@@ -466,7 +467,7 @@
         "subtasks": []
       },
       {
-        "id": "35",
+        "id": 35,
         "title": "Create comprehensive documentation",
         "description": "Write README, API docs, and integration guide",
         "details": "Document all REST endpoints with examples. Create WebSocket protocol specification. Write integration guide for clients. Include troubleshooting section. Add configuration guide.",
@@ -479,7 +480,7 @@
         "subtasks": []
       },
       {
-        "id": "36",
+        "id": 36,
         "title": "Create walking skeleton WebSocket MVP",
         "description": "Build minimal end-to-end proof: WebSocket upload, LittleFS storage, immediate playback",
         "details": "Create single main.cpp with: esp_http_server WebSocket at /ws, PUT_BEGIN/PUT_DATA/PUT_END protocol, write to LittleFS temp file, atomic rename on completion, PLAY command. Skip complex validation, just prove flow works. Use their provided code as base.",
@@ -494,7 +495,7 @@
         "subtasks": []
       },
       {
-        "id": "37",
+        "id": 37,
         "title": "Implement dual upload protocol support",
         "description": "Support both HTTP chunked uploads AND WebSocket uploads for flexibility",
         "details": "Keep HTTP POST /api/patterns for compatibility, add WebSocket upload as alternative. Share same storage backend. This gives clients choice of protocol based on their needs.",
@@ -508,7 +509,7 @@
         "subtasks": []
       },
       {
-        "id": "38",
+        "id": 38,
         "title": "Create Tauri 2 desktop app scaffold",
         "description": "Set up Tauri 2 app with Rust backend and React frontend",
         "details": "Initialize Tauri 2 project, add tokio-tungstenite for WebSocket client, mdns-sd for discovery, basic React UI with device picker and upload button. Start with their provided skeleton code.",
@@ -521,7 +522,7 @@
         "subtasks": []
       },
       {
-        "id": "39",
+        "id": 39,
         "title": "Implement Three.js LED preview",
         "description": "Create 3D preview with 320 LEDs and bloom effect",
         "details": "Use Three.js InstancedMesh for 320 LEDs on edges, MeshPhysicalMaterial with transmission for light guide plate, UnrealBloomPass for glow effect. Implement updateLEDs(rgb[]) API. Use their K1Preview class as base.",
@@ -534,7 +535,7 @@
         "subtasks": []
       },
       {
-        "id": "40",
+        "id": 40,
         "title": "Create .prism format compiler",
         "description": "Build pattern format compiler in Rust that outputs .prism files",
         "details": "Implement .prism v1 format: 32-byte header with magic 'PRISM\\x00\\x00\\x00', version, duration, CRC32. TLV body with timeline and metadata sections. Focus on structural efficiency first (shared palettes, delta encoding). Start uncompressed, structural optimizations reduce size naturally. This is the device runtime format, replacing legacy .k1p.",
@@ -547,7 +548,7 @@
         "subtasks": []
       },
       {
-        "id": "41",
+        "id": 41,
         "title": "Implement timeline editor UI (primary creation mode)",
         "description": "Create timeline interface with drag/drop clips - available but not forced on users initially",
         "details": "Single track timeline, add/move/delete clips, snap to grid, basic undo/redo. Use React with canvas or existing timeline library. Timeline editor is the PRIMARY creation mode, but users can also browse and use templates without opening the editor. Focus on minimum viable editor that works alongside template library. Compile output to .prism format.",
@@ -561,7 +562,7 @@
         "subtasks": []
       },
       {
-        "id": "42",
+        "id": 42,
         "title": "Add device discovery UI",
         "description": "Create device picker with mDNS discovery and manual IP fallback",
         "details": "List discovered devices from mDNS _k1prism._tcp, show connection status, allow manual IP entry, persist last connected device. Handle connection failures gracefully.",
@@ -574,7 +575,7 @@
         "subtasks": []
       },
       {
-        "id": "43",
+        "id": 43,
         "title": "Create monorepo structure",
         "description": "Organize code into monorepo with clear separation",
         "details": "Structure: apps/studio/ (Tauri), firmware/ (ESP-IDF), libs/pattern/ (shared Rust), specs/ (documentation). Set up workspace Cargo.toml, shared dependencies, cross-compilation scripts.",
@@ -587,7 +588,7 @@
         "subtasks": []
       },
       {
-        "id": "44",
+        "id": 44,
         "title": "Implement pattern storage UI",
         "description": "Show stored patterns on device with management controls",
         "details": "List patterns with sizes, show storage usage bar, delete patterns, reorder for playlist. Use their LIST/DELETE WebSocket commands.",
@@ -600,7 +601,7 @@
         "subtasks": []
       },
       {
-        "id": "45",
+        "id": 45,
         "title": "Add real-time parameter control",
         "description": "Implement live parameter updates via WebSocket",
         "details": "Send SET_PARAM commands for brightness, speed, hue shift. Update preview and device simultaneously. Use binary frames for efficiency if needed.",
@@ -613,7 +614,7 @@
         "subtasks": []
       },
       {
-        "id": "46",
+        "id": 46,
         "title": "Design template system architecture",
         "description": "Define structure for template library system supporting 15-20 curated templates",
         "details": "Design template metadata schema (name, description, duration, category, preview thumbnail, parameters). Define storage structure: embedded in desktop app vs remote CDN. Plan template categories: Ambient, Energy, Minimal, Rhythmic, etc. Define how templates relate to timeline editor (templates can be starting points or standalone). Target: 60-second out-of-box experience with zero creation required.",
@@ -627,7 +628,7 @@
         "subtasks": []
       },
       {
-        "id": "47",
+        "id": 47,
         "title": "Implement template library UI",
         "description": "Create browsable template gallery with preview and one-click deployment",
         "details": "Grid/list view of templates with thumbnails, category filters, search. Preview button shows Three.js visualization. Deploy button compiles template to .prism and uploads to device. Allow marking templates as favorites. Templates should feel like Netflix/Spotify browsing experience - simple, visual, immediate.",
@@ -641,7 +642,7 @@
         "subtasks": []
       },
       {
-        "id": "48",
+        "id": 48,
         "title": "Create 5 foundational templates (Phase 1)",
         "description": "Design and implement first 5 core templates covering major visual styles",
         "details": "Create templates: (1) Ambient Pulse - slow breathing effect, (2) Energy Wave - fast rhythmic motion, (3) Minimal Fade - subtle color transitions, (4) Strobe Burst - high-energy flashing, (5) Color Cycle - smooth rainbow rotation. Each template should be 10-30 seconds, use timeline format, showcase different effect types. Include preview thumbnails and metadata.",
@@ -655,7 +656,7 @@
         "subtasks": []
       },
       {
-        "id": "49",
+        "id": 49,
         "title": "Create 10 diverse templates (Phase 2)",
         "description": "Expand template library with 10 more diverse patterns",
         "details": "Create templates covering: rhythmic patterns (3), ambient/chill (2), high-energy (2), experimental (2), holiday/themed (1). Ensure variety in speed, color palette, complexity. Each template should demonstrate different combinations of effects, palettes, and timing. Total library now 15 templates.",
@@ -669,7 +670,7 @@
         "subtasks": []
       },
       {
-        "id": "50",
+        "id": 50,
         "title": "Add 5 advanced templates (Phase 3)",
         "description": "Create final 5 templates showcasing advanced techniques",
         "details": "Create advanced templates: (1) Multi-layer composition, (2) Complex palette transitions, (3) Beat-reactive pattern, (4) Generative/evolving pattern, (5) Showcase/demo pattern (best of all techniques). These templates serve as inspiration for users learning timeline editor. Total library now 20 templates. Focus on 'wow factor' to demonstrate system capabilities.",
@@ -682,7 +683,7 @@
         "subtasks": []
       },
       {
-        "id": "51",
+        "id": 51,
         "title": "Implement template-to-timeline conversion",
         "description": "Allow users to open templates in timeline editor for customization",
         "details": "Add 'Edit Template' button that loads template into timeline editor. User can modify clips, timing, palettes, then save as custom pattern. This bridges gap between templates (easy) and timeline editor (powerful). Preserve template metadata when loading. Consider 'Save as Template' to let users share creations.",
@@ -696,7 +697,7 @@
         "subtasks": []
       },
       {
-        "id": "52",
+        "id": 52,
         "title": "Add template update mechanism",
         "description": "Enable updating template library without app recompilation",
         "details": "Implement remote template manifest (JSON) that desktop app fetches on launch. Templates can be updated/added via CDN without app updates. Include version checking, local caching, and fallback to embedded templates if offline. Consider update notifications when new templates available.",
@@ -710,7 +711,7 @@
         "subtasks": []
       },
       {
-        "id": "53",
+        "id": 53,
         "title": "Add node editor as experimental feature",
         "description": "Implement node-based composition editor as advanced/experimental mode",
         "details": "Node editor is FUTURE/EXPERIMENTAL feature, not part of primary workflow. Implement basic node graph UI for advanced users: effect nodes, palette nodes, parameter nodes, composition nodes. Should feel like Blender/TouchDesigner for LED patterns. Hide behind 'Advanced Mode' toggle or separate tab. Not required for 1.0 release - timeline editor is primary creation mode.",
@@ -722,16 +723,60 @@
         ],
         "status": "pending",
         "subtasks": []
+      },
+      {
+        "id": 54,
+        "title": "Implement memory pool manager to prevent heap fragmentation",
+        "description": "Create fixed-size memory pools at startup for all dynamic allocations to prevent heap fragmentation that causes device failure within 12-48 hours",
+        "details": "Implement a memory pool manager in firmware/components/core/memory_pool.c that pre-allocates fixed-size pools during system initialization. Create three pool sizes: POOL_4KB (4096 bytes) for WebSocket frames (based on WS_BUFFER_SIZE=8192 in sdkconfig.defaults), POOL_1KB (1024 bytes) for HTTP headers and small buffers, and POOL_256B (256 bytes) for messages and control structures. Use heap_caps_malloc(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) during initialization to allocate pool memory. Implement pool structures with free lists using atomic operations (portENTER_CRITICAL/portEXIT_CRITICAL). Create prism_pool_alloc(size_t size) to return appropriate pool block, prism_pool_free(void *ptr) for returns. Add pool statistics tracking: allocations, frees, current usage, high water mark, and failed allocations. Initialize pools in system_init() before any component initialization. Replace all dynamic allocations after init with pool allocations. Add compile-time assertion to prevent malloc/free usage post-init using __wrap_malloc and __wrap_free linker wrapping. Pool sizes: 8 blocks of 4KB (32KB total), 16 blocks of 1KB (16KB total), 32 blocks of 256B (8KB total) = 56KB reserved heap.",
+        "testStrategy": "Create unit tests to verify pool initialization allocates exactly 56KB from heap. Test allocation/free patterns: allocate all blocks, verify failure on N+1, free all, reallocate. Run stress test with rapid alloc/free cycles for 72 hours monitoring heap_caps_get_free_size() to verify zero fragmentation. Test WebSocket frame allocation uses 4KB pool. Verify malloc() calls after init trigger assertion failure. Monitor pool statistics during 48-hour runtime, verify no failed allocations under normal load. Use heap_caps_check_integrity_all() every hour to detect corruption. Benchmark allocation speed vs direct malloc (target <10% overhead).",
+        "status": "pending",
+        "dependencies": [
+          1,
+          33
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 55,
+        "title": "Create heap monitoring system with fragmentation detection",
+        "description": "Implement comprehensive heap monitoring system that tracks memory health every second, detects fragmentation, and provides early warning for memory-related failures",
+        "details": "Create a dedicated heap monitoring component in firmware/components/core/heap_monitor.c with header prism_heap_monitor.h. Implement heap_monitor_init() to initialize monitoring structures and start a FreeRTOS task with 3KB stack at priority tskIDLE_PRIORITY+2. The monitoring task should run every second using vTaskDelayUntil() for precise timing. Track metrics: current free heap via esp_get_free_heap_size(), minimum free heap via esp_get_minimum_free_heap_size(), largest contiguous block via heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), and calculate fragmentation percentage as ((free_heap - largest_block) * 100) / free_heap. Implement critical thresholds: HEAP_CRITICAL_MIN (50KB), HEAP_WARNING_MIN (75KB), LARGEST_BLOCK_MIN (20KB), FRAGMENTATION_WARNING (30%), FRAGMENTATION_CRITICAL (50%). Create alert system using ESP_LOGW for warnings and ESP_LOGE for critical states. Track all task stack high-water marks by iterating through tasks using uxTaskGetSystemState() and calling uxTaskGetStackHighWaterMark() for each task handle. Log stack usage for tasks approaching limits (<512 bytes remaining). Store metrics in circular buffer (last 60 samples) for trend analysis. Implement heap_monitor_get_stats() API to return current metrics structure. Add heap integrity checking using heap_caps_check_integrity_all() every 10 seconds in debug builds (CONFIG_HEAP_POISONING_LIGHT enabled in sdkconfig.defaults). Replace the basic heap_monitor_task in main.c with this comprehensive monitoring system. Add compile-time option CONFIG_HEAP_MONITOR_ENABLE to sdkconfig.defaults. Include performance counter to track time spent in monitoring (target <1ms per cycle). Create heap_monitor_dump_stats() to output detailed report including per-task stack usage, heap trends, and fragmentation history. Integrate with system error handler to dump heap stats on crash.",
+        "testStrategy": "Verify monitoring task starts and runs without impacting system performance (<1ms overhead). Test threshold detection by allocating/freeing memory to trigger each alert level. Confirm fragmentation calculation by creating deliberate fragmentation pattern (allocate mixed sizes, free alternating blocks) and verify percentage matches expected value. Test stack monitoring by creating test task with known stack size, fill stack with pattern, verify high-water mark detection. Run 72-hour stability test monitoring all metrics, verify no memory leaks in monitor itself. Test alert system triggers at exact thresholds (50KB, 20KB largest block). Verify circular buffer correctly stores 60 samples and wraps properly. Test heap integrity checking detects deliberate corruption in debug build. Benchmark monitoring overhead stays under 1ms per second. Verify dump_stats output includes all tracked metrics in readable format. Test integration with existing heap_monitor_task replacement in main.c.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          18
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 56,
+        "title": "Implement bounds checking utilities for all input validation",
+        "description": "Create comprehensive safe buffer handling utilities with macros for secure memory operations, preventing buffer overflows and crashes through rigorous validation of all size parameters before operations.",
+        "details": "Implement prism_secure.h/c in firmware/components/core/ with critical safety utilities:\n\n1. Safe memory operations:\n- SAFE_MEMCPY(dst, src, size, max_size) - validates size <= max_size before memcpy\n- SAFE_STRNCPY(dst, src, max_len) - ensures null termination, prevents overflow\n- SAFE_MEMMOVE(dst, src, size, max_size) - bounds-checked memmove\n- BOUNDS_CHECK(ptr, offset, size, max) - validates pointer arithmetic safety\n\n2. WebSocket frame validation (per websocket_protocol.md):\n- ws_validate_frame_length(length) - check against 8192 byte maximum\n- ws_validate_tlv_bounds(type, length, payload_ptr, frame_end) - ensure TLV doesn't exceed frame\n- ws_validate_session_id(id) - prevent integer overflow in session tracking\n\n3. Pattern file validation:\n- pattern_validate_header_size(size) - check header bounds before parsing\n- pattern_validate_chunk_offset(offset, chunk_size, file_size) - prevent read beyond EOF\n- pattern_validate_filename(name, max_len) - sanitize and length check\n\n4. Array access safety:\n- SAFE_ARRAY_INDEX(array, index, size) - returns NULL if out of bounds\n- SAFE_BUFFER_APPEND(buf, data, len, buf_size) - atomic append with overflow check\n- CIRCULAR_INDEX(index, size) - safe wraparound for ring buffers\n\n5. String operations:\n- safe_strlen(str, max_len) - bounded string length\n- safe_strcmp(s1, s2, max_len) - bounded comparison\n- safe_atoi(str, result, min, max) - parse with range validation\n\n6. Integer overflow protection:\n- SAFE_ADD(a, b, result) - check for overflow before addition\n- SAFE_MUL(a, b, result) - check for multiplication overflow\n- SIZE_T_MAX_CHECK(size) - validate against platform limits\n\nAll macros should use static inline functions for type safety and include ESP_LOGE logging on violations. Functions return esp_err_t with ESP_ERR_INVALID_SIZE on bounds violations. Critical functions marked IRAM_ATTR for interrupt context safety.",
+        "testStrategy": "Create test_bounds_checking.c with comprehensive unit tests:\n1. Test each macro with valid inputs, boundary cases, and overflow attempts\n2. Verify WebSocket frames >8192 bytes are rejected\n3. Test TLV parsing with malformed lengths that exceed frame boundaries\n4. Simulate buffer overflow attempts with oversized memcpy operations\n5. Verify all safety checks log errors via ESP_LOGE\n6. Test circular buffer wraparound with CIRCULAR_INDEX\n7. Verify integer overflow detection in SAFE_ADD/SAFE_MUL\n8. Run stress test with fuzzer generating random invalid inputs\n9. Memory leak check with heap_caps_check_integrity_all()\n10. Verify no performance regression (<1% overhead) in critical paths",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-10-15T01:55:17.455Z",
+      "lastModified": "2025-10-15T01:55:47.291Z",
       "taskCount": 53,
-      "completedCount": 2,
+      "completedCount": 3,
       "tags": [
         "master"
-      ]
+      ],
+      "created": "2025-10-15T02:03:04.757Z",
+      "description": "Tasks for master context",
+      "updated": "2025-10-15T04:31:19.772Z"
     }
   }
 }

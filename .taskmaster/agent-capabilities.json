@@ -1,0 +1,42 @@
+{
+  "agent-1-network": {
+    "skills": ["websocket", "wifi", "protocols", "mDNS"],
+    "preferredTags": ["network"],
+    "maxConcurrentTasks": 2,
+    "priorityBoost": ["high"],
+    "researchEnabled": true,
+    "description": "Network Specialist - Handles WebSocket, WiFi, and protocol implementation"
+  },
+  "agent-2-storage": {
+    "skills": ["filesystem", "littlefs", "caching", "compression"],
+    "preferredTags": ["storage"],
+    "maxConcurrentTasks": 2,
+    "priorityBoost": ["high", "medium"],
+    "researchEnabled": true,
+    "description": "Storage Specialist - Manages LittleFS, pattern storage, and caching systems"
+  },
+  "agent-3-playback": {
+    "skills": ["led-driver", "effects", "animation", "rmt-peripheral"],
+    "preferredTags": ["playback"],
+    "maxConcurrentTasks": 1,
+    "criticalPath": true,
+    "researchEnabled": true,
+    "description": "Playback Specialist - Critical path for LED driver and effects engine"
+  },
+  "agent-4-integration": {
+    "skills": ["testing", "debugging", "optimization", "profiling"],
+    "preferredTags": ["integration", "master"],
+    "maxConcurrentTasks": 3,
+    "blockerResolver": true,
+    "researchEnabled": true,
+    "description": "Integration Lead - Testing, debugging, and system-wide optimization"
+  },
+  "agent-5-templates": {
+    "skills": ["creative", "patterns", "effects-design", "metadata"],
+    "preferredTags": ["templates"],
+    "maxConcurrentTasks": 2,
+    "parallelSafe": true,
+    "researchEnabled": true,
+    "description": "Template Designer - Pattern creation and template deployment"
+  }
+}
