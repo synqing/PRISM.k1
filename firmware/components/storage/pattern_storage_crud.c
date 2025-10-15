@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 static const char *TAG = "storage_crud";
 
@@ -401,7 +402,7 @@ esp_err_t template_storage_list(char **template_list, size_t max_count, size_t *
         // Add template to list
         size_t name_len = strlen(entry->d_name);
         if (name_len > 0 && name_len < MAX_FILENAME) {
-            strncpy(template_list[count], entry->d_name, name_len);
+            memcpy(template_list[count], entry->d_name, name_len);
             template_list[count][name_len] = '\0';
             count++;
         }
