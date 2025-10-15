@@ -16,6 +16,7 @@
 
 #include "protocol_parser.h"
 #include "pattern_storage.h"
+#include "led_driver.h"
 #include "esp_log.h"
 #include "esp_rom_crc.h"
 #include "freertos/FreeRTOS.h"
@@ -529,14 +530,111 @@ static esp_err_t handle_put_end(const tlv_frame_t* frame, int client_fd)
 }
 
 /* ============================================================================
- * Phase 3: Storage Integration (Subtask 4.3) - STUBS
+ * Phase 4: Playback Integration (Subtask 4.4)
  * ============================================================================ */
 
-// TODO: Implement in Phase 3
+/** Control command codes */
+#define CONTROL_CMD_PLAY        0x01  /**< Start pattern playback: {pattern_name} */
+#define CONTROL_CMD_STOP        0x02  /**< Stop pattern playback: {} */
+#define CONTROL_CMD_PAUSE       0x03  /**< Pause playback: {} */
+#define CONTROL_CMD_RESUME      0x04  /**< Resume playback: {} */
+
+/**
+ * @brief Handle CONTROL command: Playback control
+ *
+ * PRD: 0x20 - CONTROL {command, params}
+ *
+ * Control Commands:
+ * - 0x01 PLAY: Start pattern playback
+ *   Payload: command(1) + pattern_name_len(1) + pattern_name(N)
+ * - 0x02 STOP: Stop pattern playback
+ *   Payload: command(1)
+ * - 0x03 PAUSE: Pause current playback
+ *   Payload: command(1)
+ * - 0x04 RESUME: Resume paused playback
+ *   Payload: command(1)
+ */
 static esp_err_t handle_control(const tlv_frame_t* frame, int client_fd)
 {
-    ESP_LOGW(TAG, "handle_control: NOT YET IMPLEMENTED (Phase 3)");
-    return ESP_ERR_NOT_SUPPORTED;
+    // Validate payload exists
+    if (frame->payload == NULL || frame->length < 1) {
+        ESP_LOGE(TAG, "CONTROL: Empty payload (need at least command byte)");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Extract command byte
+    uint8_t command = frame->payload[0];
+
+    ESP_LOGI(TAG, "CONTROL: command=0x%02X length=%u", command, frame->length);
+
+    // Dispatch based on command type
+    switch (command) {
+        case CONTROL_CMD_PLAY: {
+            // Parse pattern name from payload
+            if (frame->length < 3) {  // command(1) + name_len(1) + name(1+)
+                ESP_LOGE(TAG, "CONTROL PLAY: payload too small (%u bytes, min 3)", frame->length);
+                return ESP_ERR_INVALID_ARG;
+            }
+
+            uint8_t name_len = frame->payload[1];
+            if (name_len == 0 || name_len >= PATTERN_MAX_FILENAME) {
+                ESP_LOGE(TAG, "CONTROL PLAY: invalid pattern name length %u", name_len);
+                return ESP_ERR_INVALID_ARG;
+            }
+
+            // Validate payload size
+            if (frame->length != 2 + name_len) {
+                ESP_LOGE(TAG, "CONTROL PLAY: payload size mismatch (got %u, expected %u)",
+                         frame->length, 2 + name_len);
+                return ESP_ERR_INVALID_ARG;
+            }
+
+            // Extract pattern name
+            char pattern_name[PATTERN_MAX_FILENAME];
+            memcpy(pattern_name, &frame->payload[2], name_len);
+            pattern_name[name_len] = '\0';
+
+            ESP_LOGI(TAG, "CONTROL PLAY: pattern='%s'", pattern_name);
+
+            // Phase 4 Implementation: Basic LED driver integration
+            // For now, start LED driver if not running
+            // Full pattern playback engine will be implemented in later phases
+            esp_err_t ret = led_driver_start();
+            if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+                ESP_LOGE(TAG, "CONTROL PLAY: LED driver start failed (%s)", esp_err_to_name(ret));
+                return ret;
+            }
+
+            ESP_LOGI(TAG, "CONTROL PLAY: LED driver started (pattern playback engine pending)");
+            return ESP_OK;
+        }
+
+        case CONTROL_CMD_STOP: {
+            ESP_LOGI(TAG, "CONTROL STOP: stopping playback");
+
+            // Stop LED driver
+            esp_err_t ret = led_driver_stop();
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "CONTROL STOP: LED driver stop failed (%s)", esp_err_to_name(ret));
+                return ret;
+            }
+
+            ESP_LOGI(TAG, "CONTROL STOP: playback stopped");
+            return ESP_OK;
+        }
+
+        case CONTROL_CMD_PAUSE:
+            ESP_LOGW(TAG, "CONTROL PAUSE: not yet implemented (pending full playback engine)");
+            return ESP_ERR_NOT_SUPPORTED;
+
+        case CONTROL_CMD_RESUME:
+            ESP_LOGW(TAG, "CONTROL RESUME: not yet implemented (pending full playback engine)");
+            return ESP_ERR_NOT_SUPPORTED;
+
+        default:
+            ESP_LOGE(TAG, "CONTROL: unknown command 0x%02X", command);
+            return ESP_ERR_NOT_SUPPORTED;
+    }
 }
 
 static esp_err_t handle_delete(const tlv_frame_t* frame, int client_fd)
