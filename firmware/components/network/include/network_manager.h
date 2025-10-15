@@ -50,6 +50,19 @@ void network_task(void *pvParameters);
  */
 esp_err_t network_deinit(void);
 
+/**
+ * @brief Send binary frame to all connected WebSocket clients
+ *
+ * Broadcasts binary data (typically TLV-encoded messages) to all active
+ * WebSocket clients. Used by TLV protocol layer to send status updates
+ * and responses.
+ *
+ * @param data Pointer to binary data buffer
+ * @param len Length of data in bytes
+ * @return ESP_OK if sent to at least one client, ESP_FAIL if no clients or error
+ */
+esp_err_t ws_broadcast_binary(const uint8_t* data, size_t len);
+
 #ifdef __cplusplus
 }
 #endif
