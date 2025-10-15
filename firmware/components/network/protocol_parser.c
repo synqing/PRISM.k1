@@ -199,26 +199,333 @@ static uint32_t get_time_ms(void)
 }
 
 /* ============================================================================
- * Phase 2: Upload Session Management (Subtask 4.2) - STUBS
+ * Phase 2: Upload Session Management (Subtask 4.2)
  * ============================================================================ */
 
-// TODO: Implement in Phase 2
+/**
+ * @brief Abort active upload session and cleanup resources
+ */
+static void abort_upload_session(const char* reason)
+{
+    ESP_LOGW(TAG, "Aborting upload session: %s", reason);
+
+    if (g_upload_session.upload_buffer != NULL) {
+        free(g_upload_session.upload_buffer);
+        g_upload_session.upload_buffer = NULL;
+    }
+
+    memset(&g_upload_session, 0, sizeof(upload_session_t));
+    g_upload_session.state = UPLOAD_STATE_IDLE;
+}
+
+/**
+ * @brief Parse PUT_BEGIN payload: {filename, size, crc}
+ *
+ * Payload format (PRD line 152):
+ * - filename_len: 1 byte (length of filename string)
+ * - filename: N bytes (UTF-8 string, not null-terminated)
+ * - expected_size: 4 bytes big-endian (total pattern size)
+ * - expected_crc: 4 bytes big-endian (expected pattern CRC32)
+ */
+static esp_err_t parse_put_begin_payload(
+    const uint8_t* payload,
+    uint16_t payload_len,
+    char* out_filename,
+    uint32_t* out_size,
+    uint32_t* out_crc)
+{
+    // Minimum: filename_len(1) + filename(1+) + size(4) + crc(4) = 10 bytes
+    if (payload_len < 10) {
+        ESP_LOGE(TAG, "PUT_BEGIN payload too small: %u bytes (min 10)", payload_len);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Parse filename length
+    uint8_t filename_len = payload[0];
+    if (filename_len == 0 || filename_len >= PATTERN_MAX_FILENAME) {
+        ESP_LOGE(TAG, "PUT_BEGIN invalid filename length: %u (max %d)",
+                 filename_len, PATTERN_MAX_FILENAME - 1);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Validate payload size matches expected structure
+    size_t expected_len = 1 + filename_len + 4 + 4; // len + name + size + crc
+    if (payload_len != expected_len) {
+        ESP_LOGE(TAG, "PUT_BEGIN payload size mismatch: got %u, expected %zu",
+                 payload_len, expected_len);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Extract filename (copy and null-terminate)
+    memcpy(out_filename, &payload[1], filename_len);
+    out_filename[filename_len] = '\0';
+
+    // Extract expected size (big-endian)
+    size_t offset = 1 + filename_len;
+    *out_size = ((uint32_t)payload[offset + 0] << 24) |
+                ((uint32_t)payload[offset + 1] << 16) |
+                ((uint32_t)payload[offset + 2] << 8) |
+                ((uint32_t)payload[offset + 3]);
+
+    // Extract expected CRC32 (big-endian)
+    offset += 4;
+    *out_crc = ((uint32_t)payload[offset + 0] << 24) |
+               ((uint32_t)payload[offset + 1] << 16) |
+               ((uint32_t)payload[offset + 2] << 8) |
+               ((uint32_t)payload[offset + 3]);
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Handle PUT_BEGIN: Initiate pattern upload session
+ *
+ * PRD: 0x10 - PUT_BEGIN {filename, size, crc}
+ */
 static esp_err_t handle_put_begin(const tlv_frame_t* frame, int client_fd)
 {
-    ESP_LOGW(TAG, "handle_put_begin: NOT YET IMPLEMENTED (Phase 2)");
-    return ESP_ERR_NOT_SUPPORTED;
+    char filename[PATTERN_MAX_FILENAME];
+    uint32_t expected_size;
+    uint32_t expected_crc;
+
+    // Parse payload
+    esp_err_t ret = parse_put_begin_payload(
+        frame->payload,
+        frame->length,
+        filename,
+        &expected_size,
+        &expected_crc
+    );
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "PUT_BEGIN: Failed to parse payload");
+        return ret;
+    }
+
+    // Validate pattern size (256KB limit per ADR-004)
+    if (expected_size == 0 || expected_size > PATTERN_MAX_SIZE) {
+        ESP_LOGE(TAG, "PUT_BEGIN: Invalid size %lu (max %lu)",
+                 (unsigned long)expected_size, (unsigned long)PATTERN_MAX_SIZE);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Acquire mutex for session state
+    xSemaphoreTake(g_upload_mutex, portMAX_DELAY);
+
+    // Check for existing active session
+    if (g_upload_session.state != UPLOAD_STATE_IDLE) {
+        xSemaphoreGive(g_upload_mutex);
+        ESP_LOGE(TAG, "PUT_BEGIN: Upload already in progress (state=%d)",
+                 g_upload_session.state);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Allocate upload buffer (will be freed in PUT_END or on error/timeout)
+    uint8_t* buffer = (uint8_t*)malloc(expected_size);
+    if (buffer == NULL) {
+        xSemaphoreGive(g_upload_mutex);
+        ESP_LOGE(TAG, "PUT_BEGIN: Failed to allocate %lu bytes",
+                 (unsigned long)expected_size);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Initialize upload session
+    g_upload_session.state = UPLOAD_STATE_RECEIVING;
+    strncpy(g_upload_session.filename, filename, PATTERN_MAX_FILENAME - 1);
+    g_upload_session.filename[PATTERN_MAX_FILENAME - 1] = '\0';
+    g_upload_session.expected_size = expected_size;
+    g_upload_session.expected_crc = expected_crc;
+    g_upload_session.bytes_received = 0;
+    g_upload_session.crc_accumulator = 0; // Will start accumulation on first PUT_DATA
+    g_upload_session.upload_buffer = buffer;
+    g_upload_session.last_activity_ms = get_time_ms();
+    g_upload_session.client_fd = client_fd;
+
+    xSemaphoreGive(g_upload_mutex);
+
+    ESP_LOGI(TAG, "PUT_BEGIN: filename='%s' size=%lu crc=0x%08lX",
+             filename, (unsigned long)expected_size, (unsigned long)expected_crc);
+
+    return ESP_OK;
 }
 
+/**
+ * @brief Handle PUT_DATA: Stream pattern data chunk
+ *
+ * PRD: 0x11 - PUT_DATA {offset, data}
+ */
 static esp_err_t handle_put_data(const tlv_frame_t* frame, int client_fd)
 {
-    ESP_LOGW(TAG, "handle_put_data: NOT YET IMPLEMENTED (Phase 2)");
-    return ESP_ERR_NOT_SUPPORTED;
+    if (frame->payload == NULL || frame->length == 0) {
+        ESP_LOGE(TAG, "PUT_DATA: Empty payload");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Payload format: offset(4 bytes big-endian) + data(N bytes)
+    if (frame->length < 4) {
+        ESP_LOGE(TAG, "PUT_DATA: Payload too small (%u bytes, min 4)", frame->length);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Parse offset (big-endian)
+    uint32_t offset = ((uint32_t)frame->payload[0] << 24) |
+                      ((uint32_t)frame->payload[1] << 16) |
+                      ((uint32_t)frame->payload[2] << 8) |
+                      ((uint32_t)frame->payload[3]);
+
+    const uint8_t* data = &frame->payload[4];
+    size_t data_len = frame->length - 4;
+
+    // Acquire mutex
+    xSemaphoreTake(g_upload_mutex, portMAX_DELAY);
+
+    // Validate session state
+    if (g_upload_session.state != UPLOAD_STATE_RECEIVING) {
+        xSemaphoreGive(g_upload_mutex);
+        ESP_LOGE(TAG, "PUT_DATA: No active upload session (state=%d)",
+                 g_upload_session.state);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Validate client ownership
+    if (g_upload_session.client_fd != client_fd) {
+        xSemaphoreGive(g_upload_mutex);
+        ESP_LOGE(TAG, "PUT_DATA: Session owned by different client");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Validate offset and length
+    if (offset + data_len > g_upload_session.expected_size) {
+        ESP_LOGE(TAG, "PUT_DATA: Data exceeds expected size (offset=%lu + len=%zu > total=%lu)",
+                 (unsigned long)offset, data_len, (unsigned long)g_upload_session.expected_size);
+        abort_upload_session("Size overflow");
+        xSemaphoreGive(g_upload_mutex);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Copy data to upload buffer
+    memcpy(&g_upload_session.upload_buffer[offset], data, data_len);
+
+    // Update bytes received counter
+    if (offset + data_len > g_upload_session.bytes_received) {
+        g_upload_session.bytes_received = offset + data_len;
+    }
+
+    // Accumulate CRC32 over received data
+    // Note: This assumes sequential uploads. For out-of-order uploads, CRC accumulation
+    // would need to be done in PUT_END over the complete buffer.
+    if (g_upload_session.crc_accumulator == 0 && offset == 0) {
+        // First chunk - initialize CRC
+        g_upload_session.crc_accumulator = esp_rom_crc32_le(0, data, data_len);
+    } else {
+        // Subsequent chunks - accumulate (only works for sequential uploads)
+        // For robustness, we'll recalculate CRC over entire buffer in PUT_END
+        g_upload_session.crc_accumulator = esp_rom_crc32_le(
+            g_upload_session.crc_accumulator,
+            data,
+            data_len
+        );
+    }
+
+    // Update activity timestamp
+    g_upload_session.last_activity_ms = get_time_ms();
+
+    float progress = (g_upload_session.bytes_received * 100.0f) / g_upload_session.expected_size;
+    ESP_LOGD(TAG, "PUT_DATA: offset=%lu len=%zu progress=%.1f%% (%lu/%lu bytes)",
+             (unsigned long)offset, data_len, progress,
+             (unsigned long)g_upload_session.bytes_received,
+             (unsigned long)g_upload_session.expected_size);
+
+    xSemaphoreGive(g_upload_mutex);
+    return ESP_OK;
 }
 
+/**
+ * @brief Handle PUT_END: Finalize pattern upload
+ *
+ * PRD: 0x12 - PUT_END {success}
+ */
 static esp_err_t handle_put_end(const tlv_frame_t* frame, int client_fd)
 {
-    ESP_LOGW(TAG, "handle_put_end: NOT YET IMPLEMENTED (Phase 2)");
-    return ESP_ERR_NOT_SUPPORTED;
+    // Acquire mutex
+    xSemaphoreTake(g_upload_mutex, portMAX_DELAY);
+
+    // Validate session state
+    if (g_upload_session.state != UPLOAD_STATE_RECEIVING) {
+        xSemaphoreGive(g_upload_mutex);
+        ESP_LOGE(TAG, "PUT_END: No active upload session (state=%d)",
+                 g_upload_session.state);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Validate client ownership
+    if (g_upload_session.client_fd != client_fd) {
+        xSemaphoreGive(g_upload_mutex);
+        ESP_LOGE(TAG, "PUT_END: Session owned by different client");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Validate completeness (all bytes received)
+    if (g_upload_session.bytes_received != g_upload_session.expected_size) {
+        ESP_LOGE(TAG, "PUT_END: Incomplete upload (received=%lu expected=%lu)",
+                 (unsigned long)g_upload_session.bytes_received,
+                 (unsigned long)g_upload_session.expected_size);
+        abort_upload_session("Incomplete upload");
+        xSemaphoreGive(g_upload_mutex);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Transition to VALIDATING state
+    g_upload_session.state = UPLOAD_STATE_VALIDATING;
+
+    // Recalculate CRC32 over entire buffer (handles out-of-order uploads)
+    uint32_t calculated_crc = esp_rom_crc32_le(
+        0,
+        g_upload_session.upload_buffer,
+        g_upload_session.expected_size
+    );
+
+    ESP_LOGI(TAG, "PUT_END: CRC32 validation - expected=0x%08lX calculated=0x%08lX",
+             (unsigned long)g_upload_session.expected_crc,
+             (unsigned long)calculated_crc);
+
+    // Validate CRC32
+    if (calculated_crc != g_upload_session.expected_crc) {
+        ESP_LOGE(TAG, "PUT_END: CRC32 mismatch!");
+        abort_upload_session("CRC mismatch");
+        xSemaphoreGive(g_upload_mutex);
+        return ESP_ERR_INVALID_CRC;
+    }
+
+    // Transition to STORING state
+    g_upload_session.state = UPLOAD_STATE_STORING;
+
+    // TODO: Task 5 - Write to storage
+    // esp_err_t ret = pattern_storage_write(
+    //     g_upload_session.filename,
+    //     g_upload_session.upload_buffer,
+    //     g_upload_session.expected_size
+    // );
+    esp_err_t ret = ESP_OK; // Stub - assume success
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "PUT_END: Storage write failed (%s)", esp_err_to_name(ret));
+        abort_upload_session("Storage write failed");
+        xSemaphoreGive(g_upload_mutex);
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "PUT_END: Pattern '%s' uploaded successfully (%lu bytes)",
+             g_upload_session.filename,
+             (unsigned long)g_upload_session.expected_size);
+
+    // Cleanup and transition to IDLE
+    free(g_upload_session.upload_buffer);
+    memset(&g_upload_session, 0, sizeof(upload_session_t));
+    g_upload_session.state = UPLOAD_STATE_IDLE;
+
+    xSemaphoreGive(g_upload_mutex);
+    return ESP_OK;
 }
 
 /* ============================================================================
