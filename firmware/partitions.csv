@@ -1,8 +1,8 @@
-# PRISM K1 Partition Table
-# Name,     Type, SubType,  Offset,   Size,     Flags
-# Note: Adjust the offsets and sizes as needed
-nvs,        data, nvs,      0x9000,   0x6000,
-phy_init,   data, phy,      0xf000,   0x1000,
-factory,    app,  factory,  0x10000,  0x200000,  # 2MB for firmware
-storage,    data, spiffs,   0x210000, 0x180000,  # 1.5MB for LittleFS
-coredump,   data, coredump, 0x390000, 0x10000,   # 64KB for core dumps
+# ESP32-S3 Partition Table for PRISM K1
+# OTA-enabled dual-app layout per ADR-001 (aligned to 64KB boundaries)
+# Name,     Type, SubType, Offset,   Size,     Flags
+nvs,        data, nvs,     0x9000,   0x6000,
+otadata,    data, ota,     0xF000,   0x2000,
+app0,       app,  ota_0,   0x20000,  0x180000,
+app1,       app,  ota_1,   0x1A0000, 0x180000,
+littlefs,   data, 0x82,    0x320000, 0x180000,
