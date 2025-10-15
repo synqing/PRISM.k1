@@ -1,0 +1,11 @@
+# Task ID: 40
+# Title: Create .prism format compiler
+# Status: pending
+# Dependencies: 38
+# Priority: high
+# Description: Build pattern format compiler in Rust that outputs .prism files
+# Details:
+Implement .prism v1 format: 32-byte header with magic 'PRISM\x00\x00\x00', version, duration, CRC32. TLV body with timeline and metadata sections. Focus on structural efficiency first (shared palettes, delta encoding). Start uncompressed, structural optimizations reduce size naturally. This is the device runtime format, replacing legacy .k1p.
+
+# Test Strategy:
+Compile test pattern to .prism, verify header structure, CRC32 validates on device, confirm structural optimizations reduce file size

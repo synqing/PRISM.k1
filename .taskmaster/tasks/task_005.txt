@@ -1,0 +1,11 @@
+# Task ID: 5
+# Title: Implement hash functions (prism_hash)
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Create CRC32 and SHA256 implementations using ESP32 ROM functions and mbedTLS
+# Details:
+CRC32: Use esp_rom_crc32_le() from ROM. SHA256: Use mbedtls_sha256_context with proper init/update/finish pattern. Create hex conversion utility. Add streaming hash support for large files.
+
+# Test Strategy:
+Verify against NIST test vectors; test streaming vs single-shot hashing produces same results

@@ -1,0 +1,11 @@
+# Task ID: 6
+# Title: Create error code system (prism_errors)
+# Status: pending
+# Dependencies: 1
+# Priority: medium
+# Description: Define comprehensive error codes with HTTP status mapping
+# Details:
+Define prism_error_t enum with PRISM_OK, PRISM_ERR_BAD_REQUEST, etc. Create error_to_http_status() mapping function. Use ESP_ERROR_CHECK_WITHOUT_ABORT for non-critical errors.
+
+# Test Strategy:
+Verify each error code maps to correct HTTP status; test error propagation through call stack

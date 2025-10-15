@@ -1,0 +1,11 @@
+# Task ID: 26
+# Title: Add mDNS service discovery
+# Status: pending
+# Dependencies: 10
+# Priority: low
+# Description: Implement zero-configuration discovery with mDNS
+# Details:
+Initialize mDNS with mdns_init(). Set hostname 'prism-k1'. Advertise _https._tcp service on port 443. Add TXT records with version, capabilities.
+
+# Test Strategy:
+Verify device appears in mDNS browser; test discovery from multiple clients

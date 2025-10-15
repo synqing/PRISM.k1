@@ -1,0 +1,11 @@
+# Task ID: 46
+# Title: Design template system architecture
+# Status: pending
+# Dependencies: 40, 41
+# Priority: high
+# Description: Define structure for template library system supporting 15-20 curated templates
+# Details:
+Design template metadata schema (name, description, duration, category, preview thumbnail, parameters). Define storage structure: embedded in desktop app vs remote CDN. Plan template categories: Ambient, Energy, Minimal, Rhythmic, etc. Define how templates relate to timeline editor (templates can be starting points or standalone). Target: 60-second out-of-box experience with zero creation required.
+
+# Test Strategy:
+Document template schema; validate it supports all required metadata; get user approval on categories

@@ -1,0 +1,11 @@
+# Task ID: 34
+# Title: Performance optimization
+# Status: pending
+# Dependencies: 19, 20, 12
+# Priority: medium
+# Description: Optimize hot paths and critical sections
+# Details:
+Profile with esp_timer functions. Optimize frame generation loop. Use DMA for LED output. Cache frequently accessed data. Reduce memory allocations in hot paths.
+
+# Test Strategy:
+Achieve 60 FPS frame generation; <100ms play command latency; >500KB/s upload speed

@@ -1,0 +1,11 @@
+# Task ID: 8
+# Title: Implement structural efficiency optimizations
+# Status: pending
+# Dependencies: 7
+# Priority: medium
+# Description: Optimize .prism format size through structural efficiency: shared palettes, delta encoding, and hot cache
+# Details:
+Focus on structure-first approach rather than algorithm compression. Implement: (1) Shared palette system - reuse color palettes across patterns to reduce duplication, (2) Delta encoding for timeline keyframes - store differences between frames instead of absolute values, (3) Hot cache for frequently used patterns - keep popular patterns in RAM. Consider Heatshrink/gzip compression as optional later enhancement, not primary strategy. Target: reduce typical pattern size by 40-60% through structural efficiency alone.
+
+# Test Strategy:
+Create test patterns with repeated palettes and verify sharing reduces file size; test delta encoding produces correct playback; benchmark hot cache hit rates

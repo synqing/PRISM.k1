@@ -1,0 +1,11 @@
+# Task ID: 19
+# Title: Implement timeline player
+# Status: pending
+# Dependencies: 18
+# Priority: high
+# Description: Create timeline-based pattern playback system
+# Details:
+Track current position in milliseconds using esp_timer_get_time(). Interpolate between keyframes. Support looping with seamless wraparound. Calculate frame data for current timestamp.
+
+# Test Strategy:
+Play 10-second pattern, verify correct position tracking; test loop wraparound

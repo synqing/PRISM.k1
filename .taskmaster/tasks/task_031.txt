@@ -1,0 +1,11 @@
+# Task ID: 31
+# Title: Create unit tests for core modules
+# Status: pending
+# Dependencies: 5, 7, 4
+# Priority: high
+# Description: Comprehensive unit tests for hash, TLV parser, and filesystem
+# Details:
+Test CRC32/SHA256 with NIST vectors. Test TLV parser with malformed data. Test filesystem atomic operations. Use Unity test framework. Run on host with ESP-IDF simulator.
+
+# Test Strategy:
+All unit tests pass; achieve >80% code coverage for core modules

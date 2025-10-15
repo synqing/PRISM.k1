@@ -1,0 +1,363 @@
+<context>
+# Overview
+PRISM.K1 is an ESP32-S3 firmware that transforms the K1 hardware into a sophisticated LED pattern controller with REST API management, WebSocket real-time control, and robust file storage. It solves the problem of efficient pattern storage, playback, and live control for LED installations, targeting professional lighting designers and interactive installations. The firmware provides HTTPS secure communication, binary pattern file support with compression, and atomic operations for reliability.
+
+# Core Features
+
+## HTTPS REST API Server
+- Secure REST endpoints for pattern management (upload, list, delete)
+- Streaming multipart uploads with progress tracking
+- JSON responses with comprehensive error codes
+- Self-signed certificate support for secure communication
+- Rate limiting and concurrent upload protection
+
+## WebSocket Real-time Control
+- Live parameter updates at 30Hz
+- Command queue system for playback control
+- Progress notifications during uploads
+- Event broadcasting to multiple clients
+- Binary and text message support
+
+## LittleFS File Storage
+- Wear-leveling filesystem for ESP32 flash
+- Atomic file operations with rename-based commits
+- Power-loss safe upload handling
+- Index management with JSON metadata
+- Automatic filesystem reconciliation on boot
+
+## Binary Pattern Format (.prism files)
+- TLV (Type-Length-Value) structure for extensibility
+- CRC32 header validation
+- SHA256 full-file integrity verification
+- Heatshrink compression support
+- Manifest metadata embedding
+
+## Execution Engine
+- Timeline-based pattern playback
+- Curve interpolation for smooth animations
+- Palette management system
+- 60 FPS LED frame generation
+- Live parameter modulation
+
+## mDNS Discovery
+- Automatic network service advertisement
+- Zero-configuration discovery
+- Service metadata broadcasting
+
+# User Experience
+
+## User Personas
+- **Lighting Designer**: Needs reliable pattern upload/management and live control
+- **Installation Tech**: Requires simple discovery and robust error recovery
+- **Developer**: Wants clear API documentation and comprehensive error codes
+
+## Key User Flows
+1. **Pattern Upload**: Client discovers device → uploads .prism file → receives confirmation
+2. **Live Control**: Connect WebSocket → send parameter updates → see immediate response
+3. **Playlist Management**: Upload patterns → create playlist → trigger sequential playback
+4. **System Recovery**: Power loss during upload → system boots → reconciles filesystem
+
+## UI/UX Considerations
+- Clear HTTP status codes matching REST conventions
+- Detailed error messages in JSON format
+- Progress updates for long operations
+- Atomic operations preventing partial states
+- Comprehensive logging via WebSocket
+</context>
+
+<PRD>
+# Technical Architecture
+
+## System Components
+
+### Core Layer (prism_core)
+- **prism_fs**: LittleFS filesystem operations, index management, atomic commits
+- **prism_hash**: CRC32 (ROM functions) and SHA256 (mbedTLS) implementations
+- **prism_prismfile**: Binary file format parsing, TLV decoder, Heatshrink decompression
+- **prism_types**: Common data structures and type definitions
+- **prism_errors**: Comprehensive error code mappings
+
+### HTTP Layer (prism_http)
+- **prism_http**: HTTPS server, REST endpoint handlers, JSON responses
+- **prism_ws**: WebSocket handler, message routing, client management
+
+### Execution Layer (prism_exec)
+- **prism_exec**: Pattern execution engine, timeline player, frame renderer
+- **prism_playlist**: Playlist management, sequential playback control
+
+### Vendor Libraries
+- **heatshrink**: Compression library (embedded)
+- **cJSON**: JSON parsing (ESP-IDF component)
+- **mbedTLS**: Cryptographic functions (ESP-IDF)
+
+## Data Models
+
+### Pattern Info Structure
+```
+- UUID (string): Unique identifier
+- Name (string): Human-readable name
+- Size (uint32): File size in bytes
+- SHA256 (string): Hex-encoded hash
+- UploadTime (timestamp): Upload timestamp
+- Duration (uint32): Pattern duration in ms
+```
+
+### Playback Status
+```
+- State (enum): idle/playing/paused
+- CurrentPattern (UUID)
+- Position (uint32): Current position in ms
+- Loop (bool): Loop enable flag
+- Parameters (map): Live parameter values
+```
+
+### WebSocket Message Format
+```
+- Type (string): Command type
+- Payload (object): Command-specific data
+- Timestamp (uint32): Message timestamp
+```
+
+## APIs and Integrations
+
+### REST Endpoints
+- POST /api/patterns - Upload new pattern
+- GET /api/patterns - List all patterns
+- DELETE /api/patterns/:id - Delete pattern
+- POST /api/play - Start playback
+- POST /api/playlist - Set playlist
+- GET /api/status - Get system status
+
+### WebSocket Commands
+- set_param - Update live parameter
+- play/pause/stop - Playback control
+- get_status - Request status update
+- subscribe/unsubscribe - Event subscriptions
+
+### ESP-IDF Components
+- esp_https_server - HTTPS server
+- esp_http_server - WebSocket support
+- esp_littlefs - Filesystem (managed)
+- mbedtls - Cryptography
+- mdns - Service discovery
+- cJSON - JSON parsing
+- esp_timer - Timing functions
+
+## Infrastructure Requirements
+
+### Memory Allocation
+- Upload buffer: 2x4KB ping-pong buffers
+- WebSocket frame: 32KB maximum
+- Pattern file: 256KB maximum
+- Index cache: Dynamic (cJSON managed)
+- Execution buffer: 8KB for LED frames
+
+### Task Architecture
+- HTTP server task (ESP-IDF managed)
+- WebSocket pump task (4KB stack, priority 3)
+- Execution engine task (8KB stack, priority 5)
+- Index manager task (4KB stack, priority 2, ephemeral)
+
+### Partition Layout
+```
+nvs:      0x9000   (24KB)  - Non-volatile storage
+otadata:  0xF000   (8KB)   - OTA data
+app0:     0x11000  (1.5MB) - Primary application
+app1:     0x181000 (1.5MB) - OTA application
+prismfs:  0x2F1000 (1MB)   - LittleFS partition
+```
+
+# Development Roadmap
+
+## Phase 1: Foundation Infrastructure
+- ESP-IDF project setup with CMake configuration
+- Partition table implementation with LittleFS allocation
+- Core filesystem operations (mount, format, basic I/O)
+- Hash functions implementation (CRC32, SHA256)
+- Error code system and logging framework
+- Basic project structure with all components
+
+## Phase 2: HTTP Server Implementation
+- HTTPS server initialization with self-signed certificate
+- REST endpoint routing and handler registration
+- Status and pattern list endpoints
+- Upload streaming handler with multipart support
+- File validation and atomic storage operations
+- JSON response formatting and error handling
+
+## Phase 3: WebSocket Integration
+- WebSocket endpoint registration and upgrade handling
+- Message parser and command router implementation
+- Client connection management with FreeRTOS queues
+- Event broadcasting system for multiple clients
+- Progress and status update notifications
+- Binary and text frame support
+
+## Phase 4: Pattern File Support
+- .prism file header validation (magic bytes, version)
+- TLV record parser implementation
+- Manifest extraction and parsing
+- Heatshrink decompression integration
+- SHA256 integrity verification
+- Index management and reconciliation
+
+## Phase 5: Execution Engine
+- Timeline-based pattern executor
+- Frame generation at 60 FPS
+- Curve interpolation algorithms
+- Palette color management
+- Live parameter modulation system
+- Playlist sequential playback
+
+## Phase 6: Testing and Hardening
+- Unit tests for hash functions with known vectors
+- Integration tests for REST API endpoints
+- WebSocket stress testing with rapid updates
+- Power-loss recovery validation
+- Memory leak detection and profiling
+- Performance optimization and benchmarking
+
+# Logical Dependency Chain
+
+## Foundation First
+1. Project structure and CMake must be established before any components
+2. Partition table defines storage before filesystem initialization
+3. Error codes and types must exist before any functional code
+4. Logging system needed for all subsequent debugging
+
+## Core Before Features
+1. Filesystem operations required before any file handling
+2. Hash functions needed for integrity checks
+3. Binary format parser required for pattern support
+4. Basic HTTP server needed before REST endpoints
+
+## Integration Points
+1. WebSocket requires HTTP server to be running
+2. Execution engine needs pattern files to be parseable
+3. Playlist manager depends on execution engine
+4. Index reconciliation requires filesystem and hash functions
+
+## Testing Dependencies
+1. Unit tests can begin after individual modules complete
+2. Integration tests require full REST API implementation
+3. Stress tests need WebSocket and execution engine
+4. Recovery tests require complete upload pipeline
+
+# Risks and Mitigations
+
+## Technical Challenges
+
+### Flash Wear Leveling
+- Risk: Frequent uploads could wear flash prematurely
+- Mitigation: LittleFS provides built-in wear leveling; implement upload rate limiting
+
+### Memory Fragmentation
+- Risk: Dynamic allocations could fragment heap
+- Mitigation: Use static buffers where possible; implement memory pools for dynamic needs
+
+### Concurrent Access
+- Risk: Race conditions between HTTP uploads and execution
+- Mitigation: Use FreeRTOS mutexes; implement clear ownership model
+
+### Network Security
+- Risk: Self-signed certificates trigger browser warnings
+- Mitigation: Document certificate installation process; consider certificate provisioning
+
+## Resource Constraints
+
+### Flash Storage Limitations
+- Risk: 1MB partition fills quickly with patterns
+- Mitigation: Implement storage quotas; provide clear space monitoring
+
+### RAM Constraints
+- Risk: Large patterns could exhaust RAM during decompression
+- Mitigation: Stream processing where possible; chunk-based decompression
+
+### CPU Performance
+- Risk: 60 FPS generation could impact network responsiveness
+- Mitigation: Priority-based task scheduling; optimize hot paths
+
+## Reliability Concerns
+
+### Power Loss During Upload
+- Risk: Corrupted filesystem or partial files
+- Mitigation: Atomic rename operations; filesystem reconciliation on boot
+
+### Network Interruptions
+- Risk: Incomplete uploads or lost WebSocket connections
+- Mitigation: Upload resumption support; automatic WebSocket reconnection
+
+### Pattern Corruption
+- Risk: Bad data could crash execution engine
+- Mitigation: Comprehensive validation; safe parsing with bounds checks
+
+# Appendix
+
+## Reference Specifications
+
+### Binary .prism File Format
+```
+Header (64 bytes):
+  - Magic: "PRISM\x00\x00\x00" (8 bytes)
+  - Version: uint32
+  - Flags: uint32
+  - DataSize: uint32
+  - CompressedSize: uint32
+  - CRC32: uint32
+  - Reserved: (32 bytes)
+
+TLV Records:
+  - Type: uint16
+  - Length: uint32
+  - Value: variable
+
+Record Types:
+  - 0x0001: Manifest (JSON)
+  - 0x0002: Timeline (binary)
+  - 0x0003: Curves (binary)
+  - 0x0004: Palette (binary)
+  - 0x0005: Compressed data
+```
+
+### Error Code Mappings
+```
+PRISM_OK (0) → 200 OK
+PRISM_ERR_BAD_REQUEST (1) → 400 Bad Request
+PRISM_ERR_EXISTS (2) → 409 Conflict
+PRISM_ERR_NOT_FOUND (3) → 404 Not Found
+PRISM_ERR_TOO_LARGE (4) → 413 Payload Too Large
+PRISM_ERR_INTEGRITY (5) → 422 Unprocessable Entity
+PRISM_ERR_FORMAT (6) → 422 Unprocessable Entity
+PRISM_ERR_NO_SPACE (7) → 507 Insufficient Storage
+PRISM_ERR_RATE_LIMIT (8) → 429 Too Many Requests
+PRISM_ERR_INTERNAL (9) → 500 Internal Server Error
+PRISM_ERR_TIMEOUT (10) → 408 Request Timeout
+PRISM_ERR_NO_MEMORY (11) → 503 Service Unavailable
+```
+
+### Performance Targets
+- Upload throughput: >500KB/s on LAN
+- Play command latency: <100ms
+- WebSocket parameter updates: 30Hz sustained
+- LED frame generation: 60 FPS (16.67ms/frame)
+- Boot to ready: <3 seconds
+- Pattern switch time: <50ms
+
+### Security Considerations
+- HTTPS only (no HTTP fallback)
+- SHA256 verification for all uploads
+- Rate limiting: 10 requests/minute for uploads
+- Maximum concurrent uploads: 2
+- WebSocket frame size limit: 32KB
+- Total pattern size limit: 256KB
+
+### Testing Checklist
+- [ ] CRC32/SHA256 with NIST test vectors
+- [ ] TLV parser with malformed inputs
+- [ ] Upload with power loss at 50%
+- [ ] 100 rapid sequential uploads
+- [ ] WebSocket with 10 concurrent clients
+- [ ] Memory usage under 180KB
+- [ ] CPU usage under 70% during playback
+- [ ] Filesystem recovery after corruption
+</PRD>

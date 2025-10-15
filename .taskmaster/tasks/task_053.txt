@@ -1,0 +1,11 @@
+# Task ID: 53
+# Title: Add node editor as experimental feature
+# Status: pending
+# Dependencies: 41, 50
+# Priority: low
+# Description: Implement node-based composition editor as advanced/experimental mode
+# Details:
+Node editor is FUTURE/EXPERIMENTAL feature, not part of primary workflow. Implement basic node graph UI for advanced users: effect nodes, palette nodes, parameter nodes, composition nodes. Should feel like Blender/TouchDesigner for LED patterns. Hide behind 'Advanced Mode' toggle or separate tab. Not required for 1.0 release - timeline editor is primary creation mode.
+
+# Test Strategy:
+Create simple 2-node graph, compile to .prism, verify output matches timeline-created pattern

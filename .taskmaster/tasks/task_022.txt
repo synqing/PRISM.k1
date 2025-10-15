@@ -1,0 +1,11 @@
+# Task ID: 22
+# Title: Implement live parameter system
+# Status: pending
+# Dependencies: 18, 16
+# Priority: medium
+# Description: Add real-time parameter modulation via WebSocket
+# Details:
+Support parameters: intensity, speed, hue_shift, saturation. Store in shared structure with mutex protection. Apply modulation during frame generation. Send updates to execution engine via queue.
+
+# Test Strategy:
+Change parameters via WebSocket, verify immediate effect; test thread safety

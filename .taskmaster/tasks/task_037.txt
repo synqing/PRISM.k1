@@ -1,0 +1,11 @@
+# Task ID: 37
+# Title: Implement dual upload protocol support
+# Status: pending
+# Dependencies: 12, 36
+# Priority: medium
+# Description: Support both HTTP chunked uploads AND WebSocket uploads for flexibility
+# Details:
+Keep HTTP POST /api/patterns for compatibility, add WebSocket upload as alternative. Share same storage backend. This gives clients choice of protocol based on their needs.
+
+# Test Strategy:
+Upload same file via both protocols, verify identical storage results

@@ -1,0 +1,11 @@
+# Task ID: 52
+# Title: Add template update mechanism
+# Status: pending
+# Dependencies: 47, 50
+# Priority: low
+# Description: Enable updating template library without app recompilation
+# Details:
+Implement remote template manifest (JSON) that desktop app fetches on launch. Templates can be updated/added via CDN without app updates. Include version checking, local caching, and fallback to embedded templates if offline. Consider update notifications when new templates available.
+
+# Test Strategy:
+Update remote manifest, restart app, verify new templates appear; test offline mode falls back to embedded templates

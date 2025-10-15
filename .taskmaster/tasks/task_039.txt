@@ -1,0 +1,11 @@
+# Task ID: 39
+# Title: Implement Three.js LED preview
+# Status: pending
+# Dependencies: 38
+# Priority: medium
+# Description: Create 3D preview with 320 LEDs and bloom effect
+# Details:
+Use Three.js InstancedMesh for 320 LEDs on edges, MeshPhysicalMaterial with transmission for light guide plate, UnrealBloomPass for glow effect. Implement updateLEDs(rgb[]) API. Use their K1Preview class as base.
+
+# Test Strategy:
+Preview renders at 60 FPS, LEDs update in real-time with color data

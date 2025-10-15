@@ -1,0 +1,11 @@
+# Task ID: 38
+# Title: Create Tauri 2 desktop app scaffold
+# Status: pending
+# Dependencies: 36
+# Priority: medium
+# Description: Set up Tauri 2 app with Rust backend and React frontend
+# Details:
+Initialize Tauri 2 project, add tokio-tungstenite for WebSocket client, mdns-sd for discovery, basic React UI with device picker and upload button. Start with their provided skeleton code.
+
+# Test Strategy:
+App launches, discovers ESP32 device via mDNS, connects via WebSocket

@@ -1,0 +1,11 @@
+# Task ID: 13
+# Title: Implement pattern list endpoint
+# Status: pending
+# Dependencies: 11, 4
+# Priority: medium
+# Description: Create GET /api/patterns handler that returns JSON array of stored patterns
+# Details:
+Read /prism/.index.json, parse with cJSON, build response array with: uuid, name, size, uploadTime, duration. Set Content-Type: application/json. Handle empty index gracefully.
+
+# Test Strategy:
+Upload 3 patterns, verify list returns all 3 with correct metadata; test with empty storage

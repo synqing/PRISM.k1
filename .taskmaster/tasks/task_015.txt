@@ -1,0 +1,11 @@
+# Task ID: 15
+# Title: Add WebSocket endpoint (prism_ws)
+# Status: pending
+# Dependencies: 10
+# Priority: high
+# Description: Register WebSocket handler at /ws with upgrade support
+# Details:
+Handle HTTP_GET for handshake with httpd_ws_respond_server_handshake(). Implement frame receiving with httpd_ws_recv_frame(). Support both text and binary frames. Maintain client connection list.
+
+# Test Strategy:
+Test WebSocket handshake with wscat; send/receive text messages; verify binary frame support

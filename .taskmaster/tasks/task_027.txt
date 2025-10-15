@@ -1,0 +1,11 @@
+# Task ID: 27
+# Title: Implement rate limiting
+# Status: pending
+# Dependencies: 12
+# Priority: medium
+# Description: Add upload rate limiting to prevent abuse
+# Details:
+Track requests per IP using hash table. Limit to 10 uploads per minute. Return 429 Too Many Requests when exceeded. Reset counters every minute using timer.
+
+# Test Strategy:
+Send 11 rapid uploads, verify 11th returns 429; test counter reset after timeout

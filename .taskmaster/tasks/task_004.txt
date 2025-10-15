@@ -1,0 +1,11 @@
+# Task ID: 4
+# Title: Implement core filesystem operations (prism_fs)
+# Status: pending
+# Dependencies: 2, 3
+# Priority: high
+# Description: Create filesystem abstraction layer with LittleFS mounting, atomic operations, and index management
+# Details:
+Implement prism_fs_init() with esp_vfs_littlefs_register(), format_if_mount_failed=true. Create atomic commit pattern: write to .tmp file, fsync, rename. Implement index operations using cJSON for metadata storage at /prism/.index.json.
+
+# Test Strategy:
+Unit test: mount/unmount cycle, create/rename/delete file operations, verify atomic rename works correctly

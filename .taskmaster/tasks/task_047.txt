@@ -1,0 +1,11 @@
+# Task ID: 47
+# Title: Implement template library UI
+# Status: pending
+# Dependencies: 46, 39
+# Priority: high
+# Description: Create browsable template gallery with preview and one-click deployment
+# Details:
+Grid/list view of templates with thumbnails, category filters, search. Preview button shows Three.js visualization. Deploy button compiles template to .prism and uploads to device. Allow marking templates as favorites. Templates should feel like Netflix/Spotify browsing experience - simple, visual, immediate.
+
+# Test Strategy:
+Browse templates, preview 3 different templates, deploy one to device, verify it plays correctly

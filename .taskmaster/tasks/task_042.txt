@@ -1,0 +1,11 @@
+# Task ID: 42
+# Title: Add device discovery UI
+# Status: pending
+# Dependencies: 38
+# Priority: high
+# Description: Create device picker with mDNS discovery and manual IP fallback
+# Details:
+List discovered devices from mDNS _k1prism._tcp, show connection status, allow manual IP entry, persist last connected device. Handle connection failures gracefully.
+
+# Test Strategy:
+Discover device on network, connect, disconnect, reconnect successfully

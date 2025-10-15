@@ -1,0 +1,11 @@
+# Task ID: 25
+# Title: Implement status endpoint
+# Status: pending
+# Dependencies: 11, 18, 4
+# Priority: medium
+# Description: Create GET /api/status with comprehensive system information
+# Details:
+Return JSON with: playback state, current pattern, position, loop status, live parameters, storage usage, system uptime. Calculate storage from esp_littlefs_info().
+
+# Test Strategy:
+Query status during playback, verify all fields present and accurate

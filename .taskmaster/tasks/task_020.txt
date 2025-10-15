@@ -1,0 +1,11 @@
+# Task ID: 20
+# Title: Implement curve interpolation
+# Status: pending
+# Dependencies: 19
+# Priority: medium
+# Description: Add smooth interpolation between pattern keyframes
+# Details:
+Support linear, ease-in, ease-out, ease-in-out curves. Use fixed-point math for efficiency. Implement cubic bezier for smooth transitions. Cache calculated values where possible.
+
+# Test Strategy:
+Verify interpolation produces smooth values; test all curve types; benchmark performance

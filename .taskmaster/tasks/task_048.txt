@@ -1,0 +1,11 @@
+# Task ID: 48
+# Title: Create 5 foundational templates (Phase 1)
+# Status: pending
+# Dependencies: 46, 40
+# Priority: high
+# Description: Design and implement first 5 core templates covering major visual styles
+# Details:
+Create templates: (1) Ambient Pulse - slow breathing effect, (2) Energy Wave - fast rhythmic motion, (3) Minimal Fade - subtle color transitions, (4) Strobe Burst - high-energy flashing, (5) Color Cycle - smooth rainbow rotation. Each template should be 10-30 seconds, use timeline format, showcase different effect types. Include preview thumbnails and metadata.
+
+# Test Strategy:
+Deploy each template, verify visual quality matches intent, ensure all compile to .prism correctly

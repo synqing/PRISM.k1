@@ -1,0 +1,104 @@
+{
+  "tasks": [
+    {
+      "id": "36",
+      "title": "Create walking skeleton WebSocket MVP",
+      "description": "Build minimal end-to-end proof: WebSocket upload, LittleFS storage, immediate playback",
+      "details": "Create single main.cpp with: esp_http_server WebSocket at /ws, PUT_BEGIN/PUT_DATA/PUT_END protocol, write to LittleFS temp file, atomic rename on completion, PLAY command. Skip complex validation, just prove flow works. Use their provided code as base.",
+      "testStrategy": "Upload 10KB test pattern via wscat, verify file stored, PLAY command returns success",
+      "priority": "high",
+      "dependencies": ["1", "2", "3"],
+      "status": "pending"
+    },
+    {
+      "id": "37",
+      "title": "Implement dual upload protocol support",
+      "description": "Support both HTTP chunked uploads AND WebSocket uploads for flexibility",
+      "details": "Keep HTTP POST /api/patterns for compatibility, add WebSocket upload as alternative. Share same storage backend. This gives clients choice of protocol based on their needs.",
+      "testStrategy": "Upload same file via both protocols, verify identical storage results",
+      "priority": "medium",
+      "dependencies": ["12", "36"],
+      "status": "pending"
+    },
+    {
+      "id": "38",
+      "title": "Create Tauri 2 desktop app scaffold",
+      "description": "Set up Tauri 2 app with Rust backend and React frontend",
+      "details": "Initialize Tauri 2 project, add tokio-tungstenite for WebSocket client, mdns-sd for discovery, basic React UI with device picker and upload button. Start with their provided skeleton code.",
+      "testStrategy": "App launches, discovers ESP32 device via mDNS, connects via WebSocket",
+      "priority": "medium",
+      "dependencies": ["36"],
+      "status": "pending"
+    },
+    {
+      "id": "39",
+      "title": "Implement Three.js LED preview",
+      "description": "Create 3D preview with 320 LEDs and bloom effect",
+      "details": "Use Three.js InstancedMesh for 320 LEDs on edges, MeshPhysicalMaterial with transmission for light guide plate, UnrealBloomPass for glow effect. Implement updateLEDs(rgb[]) API. Use their K1Preview class as base.",
+      "testStrategy": "Preview renders at 60 FPS, LEDs update in real-time with color data",
+      "priority": "medium",
+      "dependencies": ["38"],
+      "status": "pending"
+    },
+    {
+      "id": "40",
+      "title": "Create simplified .k1p format compiler",
+      "description": "Build minimal pattern format compiler in Rust",
+      "details": "Implement .k1p v1 format: 32-byte header with magic/version/duration/CRC32, TLV body with timeline and metadata sections. Start uncompressed, add compression later. Use their pattern.rs as base.",
+      "testStrategy": "Compile test pattern, verify header structure, CRC32 validates on device",
+      "priority": "high",
+      "dependencies": ["38"],
+      "status": "pending"
+    },
+    {
+      "id": "41",
+      "title": "Implement timeline editor UI",
+      "description": "Create basic timeline interface with drag/drop clips",
+      "details": "Single track timeline, add/move/delete clips, snap to grid, basic undo/redo. Use React with canvas or existing timeline library. Focus on minimum viable editor.",
+      "testStrategy": "Create 3-clip timeline, compile to .k1p, play on device",
+      "priority": "medium",
+      "dependencies": ["39", "40"],
+      "status": "pending"
+    },
+    {
+      "id": "42",
+      "title": "Add device discovery UI",
+      "description": "Create device picker with mDNS discovery and manual IP fallback",
+      "details": "List discovered devices from mDNS _k1prism._tcp, show connection status, allow manual IP entry, persist last connected device. Handle connection failures gracefully.",
+      "testStrategy": "Discover device on network, connect, disconnect, reconnect successfully",
+      "priority": "high",
+      "dependencies": ["38"],
+      "status": "pending"
+    },
+    {
+      "id": "43",
+      "title": "Create monorepo structure",
+      "description": "Organize code into monorepo with clear separation",
+      "details": "Structure: apps/studio/ (Tauri), firmware/ (ESP-IDF), libs/pattern/ (shared Rust), specs/ (documentation). Set up workspace Cargo.toml, shared dependencies, cross-compilation scripts.",
+      "testStrategy": "All components build independently, shared libs link correctly",
+      "priority": "low",
+      "dependencies": ["38"],
+      "status": "pending"
+    },
+    {
+      "id": "44",
+      "title": "Implement pattern storage UI",
+      "description": "Show stored patterns on device with management controls",
+      "details": "List patterns with sizes, show storage usage bar, delete patterns, reorder for playlist. Use their LIST/DELETE WebSocket commands.",
+      "testStrategy": "List shows all patterns, delete removes from device, storage bar accurate",
+      "priority": "medium",
+      "dependencies": ["42"],
+      "status": "pending"
+    },
+    {
+      "id": "45",
+      "title": "Add real-time parameter control",
+      "description": "Implement live parameter updates via WebSocket",
+      "details": "Send SET_PARAM commands for brightness, speed, hue shift. Update preview and device simultaneously. Use binary frames for efficiency if needed.",
+      "testStrategy": "Adjust parameter in UI, see immediate change on device and preview",
+      "priority": "low",
+      "dependencies": ["41"],
+      "status": "pending"
+    }
+  ]
+}

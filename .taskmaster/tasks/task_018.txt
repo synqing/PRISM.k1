@@ -1,0 +1,11 @@
+# Task ID: 18
+# Title: Create execution engine task (prism_exec)
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Implement FreeRTOS task for pattern execution with command queue
+# Details:
+Create task with 8KB stack, priority tskIDLE_PRIORITY+5. Implement command queue (depth 16) for play/pause/stop commands. Main loop: check queue, update timeline, generate frame, output to LEDs at 60 FPS.
+
+# Test Strategy:
+Task starts and runs without stack overflow; verify 60 FPS timing; test command processing

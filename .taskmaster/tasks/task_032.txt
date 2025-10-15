@@ -1,0 +1,11 @@
+# Task ID: 32
+# Title: Create integration tests
+# Status: pending
+# Dependencies: 24, 12, 16
+# Priority: medium
+# Description: End-to-end tests for upload, playback, and WebSocket flows
+# Details:
+Write shell scripts using curl and wscat. Test full upload flow with verification. Test pattern playback via API. Test WebSocket parameter updates. Include negative test cases.
+
+# Test Strategy:
+All integration tests pass; test on actual hardware with network

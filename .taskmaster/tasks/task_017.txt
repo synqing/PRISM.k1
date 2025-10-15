@@ -1,0 +1,11 @@
+# Task ID: 17
+# Title: Implement WebSocket client management
+# Status: pending
+# Dependencies: 15, 16
+# Priority: medium
+# Description: Track connected clients and enable broadcasting
+# Details:
+Maintain array of client file descriptors (max 5). Add clients on connection, remove on disconnect. Implement broadcast function for events. Use httpd_ws_send_frame_async() for non-blocking sends.
+
+# Test Strategy:
+Connect 3 clients, verify all receive broadcasts; test client limit enforcement

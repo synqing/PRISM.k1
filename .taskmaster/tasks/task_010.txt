@@ -1,0 +1,11 @@
+# Task ID: 10
+# Title: Initialize HTTPS server (prism_http)
+# Status: pending
+# Dependencies: 9
+# Priority: high
+# Description: Set up esp_https_server with embedded certificate and basic configuration
+# Details:
+Use httpd_ssl_config_t with HTTPD_SSL_CONFIG_DEFAULT(), set server_cert and server_key from embedded strings. Configure max_uri_handlers=20, max_open_sockets=7, stack_size=8192. Start server on port 443.
+
+# Test Strategy:
+Server starts successfully; curl -k https://device-ip/ returns connection; check memory usage

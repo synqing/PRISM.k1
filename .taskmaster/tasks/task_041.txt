@@ -1,0 +1,11 @@
+# Task ID: 41
+# Title: Implement timeline editor UI (primary creation mode)
+# Status: pending
+# Dependencies: 39, 40
+# Priority: high
+# Description: Create timeline interface with drag/drop clips - available but not forced on users initially
+# Details:
+Single track timeline, add/move/delete clips, snap to grid, basic undo/redo. Use React with canvas or existing timeline library. Timeline editor is the PRIMARY creation mode, but users can also browse and use templates without opening the editor. Focus on minimum viable editor that works alongside template library. Compile output to .prism format.
+
+# Test Strategy:
+Create 3-clip timeline, compile to .prism, play on device; verify users can use app without opening timeline editor

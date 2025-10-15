@@ -1,0 +1,11 @@
+# Task ID: 45
+# Title: Add real-time parameter control
+# Status: pending
+# Dependencies: 41
+# Priority: low
+# Description: Implement live parameter updates via WebSocket
+# Details:
+Send SET_PARAM commands for brightness, speed, hue shift. Update preview and device simultaneously. Use binary frames for efficiency if needed.
+
+# Test Strategy:
+Adjust parameter in UI, see immediate change on device and preview

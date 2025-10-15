@@ -1,0 +1,11 @@
+# Task ID: 30
+# Title: Implement power-loss recovery
+# Status: pending
+# Dependencies: 4, 29
+# Priority: medium
+# Description: Add mechanisms to handle power loss during operations
+# Details:
+Use journaling for critical operations. Implement two-phase commit for uploads. Add recovery markers in NVS. Clean incomplete operations on boot.
+
+# Test Strategy:
+Simulate power loss during upload (unit test), verify cleanup on restart

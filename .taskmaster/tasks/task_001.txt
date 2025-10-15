@@ -1,0 +1,11 @@
+# Task ID: 1
+# Title: Initialize ESP-IDF v5.x project structure
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Set up the complete ESP-IDF project with CMake configuration, component structure, and build system
+# Details:
+Create root CMakeLists.txt with include($ENV{IDF_PATH}/tools/cmake/project.cmake), set up main component with entry point, configure sdkconfig.defaults with CONFIG_FREERTOS_HZ=1000, CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192. Create idf_component.yml for dependency management.
+
+# Test Strategy:
+Run idf.py build to verify successful compilation; check that all components are detected

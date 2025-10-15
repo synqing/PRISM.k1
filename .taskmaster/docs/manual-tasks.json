@@ -1,0 +1,354 @@
+{
+  "tasks": [
+    {
+      "id": "1",
+      "title": "Initialize ESP-IDF v5.x project structure",
+      "description": "Set up the complete ESP-IDF project with CMake configuration, component structure, and build system",
+      "details": "Create root CMakeLists.txt with include($ENV{IDF_PATH}/tools/cmake/project.cmake), set up main component with entry point, configure sdkconfig.defaults with CONFIG_FREERTOS_HZ=1000, CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192. Create idf_component.yml for dependency management.",
+      "testStrategy": "Run idf.py build to verify successful compilation; check that all components are detected",
+      "priority": "high",
+      "dependencies": [],
+      "status": "pending"
+    },
+    {
+      "id": "2", 
+      "title": "Configure partition table with LittleFS",
+      "description": "Create custom partition table with dedicated LittleFS partition for pattern storage",
+      "details": "Create partitions.csv with: nvs (0x9000, 24KB), otadata (0xF000, 8KB), app0 (0x11000, 1.5MB), app1 (0x181000, 1.5MB), prismfs data 0x82 (0x2F1000, 1MB). Set CONFIG_PARTITION_TABLE_CUSTOM=y in sdkconfig.defaults.",
+      "testStrategy": "Run idf.py partition-table to verify partition layout; ensure prismfs partition is correctly sized at 1MB",
+      "priority": "high",
+      "dependencies": ["1"],
+      "status": "pending"
+    },
+    {
+      "id": "3",
+      "title": "Add LittleFS managed component",
+      "description": "Integrate joltwallet/littlefs as managed component using ESP-IDF Component Manager",
+      "details": "Add to idf_component.yml: dependencies: joltwallet/littlefs: '^1.20.1'. Run idf.py reconfigure to fetch component. Verify component downloaded to managed_components directory.",
+      "testStrategy": "Check managed_components/joltwallet__littlefs exists; verify CMake finds the component",
+      "priority": "high",
+      "dependencies": ["1"],
+      "status": "pending"
+    },
+    {
+      "id": "4",
+      "title": "Implement core filesystem operations (prism_fs)",
+      "description": "Create filesystem abstraction layer with LittleFS mounting, atomic operations, and index management",
+      "details": "Implement prism_fs_init() with esp_vfs_littlefs_register(), format_if_mount_failed=true. Create atomic commit pattern: write to .tmp file, fsync, rename. Implement index operations using cJSON for metadata storage at /prism/.index.json.",
+      "testStrategy": "Unit test: mount/unmount cycle, create/rename/delete file operations, verify atomic rename works correctly",
+      "priority": "high",
+      "dependencies": ["2", "3"],
+      "status": "pending"
+    },
+    {
+      "id": "5",
+      "title": "Implement hash functions (prism_hash)",
+      "description": "Create CRC32 and SHA256 implementations using ESP32 ROM functions and mbedTLS",
+      "details": "CRC32: Use esp_rom_crc32_le() from ROM. SHA256: Use mbedtls_sha256_context with proper init/update/finish pattern. Create hex conversion utility. Add streaming hash support for large files.",
+      "testStrategy": "Verify against NIST test vectors; test streaming vs single-shot hashing produces same results",
+      "priority": "high",
+      "dependencies": ["1"],
+      "status": "pending"
+    },
+    {
+      "id": "6",
+      "title": "Create error code system (prism_errors)",
+      "description": "Define comprehensive error codes with HTTP status mapping",
+      "details": "Define prism_error_t enum with PRISM_OK, PRISM_ERR_BAD_REQUEST, etc. Create error_to_http_status() mapping function. Use ESP_ERROR_CHECK_WITHOUT_ABORT for non-critical errors.",
+      "testStrategy": "Verify each error code maps to correct HTTP status; test error propagation through call stack",
+      "priority": "medium",
+      "dependencies": ["1"],
+      "status": "pending"
+    },
+    {
+      "id": "7",
+      "title": "Implement binary file format parser (prism_prismfile)",
+      "description": "Create .prism file header validation and TLV record parser with bounds checking",
+      "details": "Validate magic bytes 'PRISM\\x00\\x00\\x00', version check, CRC32 header verification. Implement safe TLV parser with: bounds checking, maximum length validation, safe memory allocation. Support record types 0x0001-0x0005.",
+      "testStrategy": "Test with malformed headers, oversized TLV records, corrupted CRC32; verify parser rejects invalid files safely",
+      "priority": "high",
+      "dependencies": ["5", "6"],
+      "status": "pending"
+    },
+    {
+      "id": "8",
+      "title": "Integrate Heatshrink compression",
+      "description": "Add Heatshrink as vendored library for pattern decompression",
+      "details": "Copy heatshrink_decoder.c/h and heatshrink_common.h to components/heatshrink. Configure with HEATSHRINK_STATIC_WINDOWS_SIZE=10, HEATSHRINK_STATIC_LOOKAHEAD_SIZE=5. Implement streaming decompression with chunk processing.",
+      "testStrategy": "Compress test data externally, verify decompression produces original; test with various compression ratios",
+      "priority": "medium",
+      "dependencies": ["7"],
+      "status": "pending"
+    },
+    {
+      "id": "9",
+      "title": "Generate self-signed certificate for HTTPS",
+      "description": "Create and embed self-signed certificate for HTTPS server",
+      "details": "Generate 2048-bit RSA certificate with: openssl req -x509 -newkey rsa:2048 -keyout server_key.pem -out server_cert.pem -days 365 -nodes. Embed as string literals in prism_http.c. Consider future certificate provisioning mechanism.",
+      "testStrategy": "Verify certificate loads correctly; test HTTPS connection with curl -k; check certificate details with openssl x509",
+      "priority": "high",
+      "dependencies": ["1"],
+      "status": "pending"
+    },
+    {
+      "id": "10",
+      "title": "Initialize HTTPS server (prism_http)",
+      "description": "Set up esp_https_server with embedded certificate and basic configuration",
+      "details": "Use httpd_ssl_config_t with HTTPD_SSL_CONFIG_DEFAULT(), set server_cert and server_key from embedded strings. Configure max_uri_handlers=20, max_open_sockets=7, stack_size=8192. Start server on port 443.",
+      "testStrategy": "Server starts successfully; curl -k https://device-ip/ returns connection; check memory usage",
+      "priority": "high",
+      "dependencies": ["9"],
+      "status": "pending"
+    },
+    {
+      "id": "11",
+      "title": "Implement REST endpoint routing",
+      "description": "Create URI handlers for all REST endpoints with proper HTTP methods",
+      "details": "Register handlers: POST /api/patterns (upload), GET /api/patterns (list), DELETE /api/patterns/:id (delete), POST /api/play (play), POST /api/playlist (playlist), GET /api/status (status). Use httpd_register_uri_handler() for each.",
+      "testStrategy": "Each endpoint responds with correct status code; test with curl for all HTTP methods",
+      "priority": "high",
+      "dependencies": ["10"],
+      "status": "pending"
+    },
+    {
+      "id": "12",
+      "title": "Implement streaming upload handler",
+      "description": "Create multipart upload handler with progress tracking and SHA256 verification",
+      "details": "Use httpd_req_recv() in chunks of 4KB. Write to temporary file in /prism/.upload/. Calculate SHA256 during upload. Verify against X-PRISM-SHA256 header. Atomic rename on success. Send progress via WebSocket if connected.",
+      "testStrategy": "Upload 50KB file, verify SHA256 matches; test interrupted upload cleanup; verify atomic commit",
+      "priority": "high",
+      "dependencies": ["11", "4", "5"],
+      "status": "pending"
+    },
+    {
+      "id": "13",
+      "title": "Implement pattern list endpoint",
+      "description": "Create GET /api/patterns handler that returns JSON array of stored patterns",
+      "details": "Read /prism/.index.json, parse with cJSON, build response array with: uuid, name, size, uploadTime, duration. Set Content-Type: application/json. Handle empty index gracefully.",
+      "testStrategy": "Upload 3 patterns, verify list returns all 3 with correct metadata; test with empty storage",
+      "priority": "medium",
+      "dependencies": ["11", "4"],
+      "status": "pending"
+    },
+    {
+      "id": "14",
+      "title": "Implement pattern delete endpoint",
+      "description": "Create DELETE handler with index cleanup",
+      "details": "Parse UUID from URI path. Check file exists. Delete file with prism_fs_delete(). Update index to remove entry. Return 404 if not found, 200 on success.",
+      "testStrategy": "Delete existing pattern, verify file removed and index updated; test deleting non-existent returns 404",
+      "priority": "medium",
+      "dependencies": ["11", "4"],
+      "status": "pending"
+    },
+    {
+      "id": "15",
+      "title": "Add WebSocket endpoint (prism_ws)",
+      "description": "Register WebSocket handler at /ws with upgrade support",
+      "details": "Handle HTTP_GET for handshake with httpd_ws_respond_server_handshake(). Implement frame receiving with httpd_ws_recv_frame(). Support both text and binary frames. Maintain client connection list.",
+      "testStrategy": "Test WebSocket handshake with wscat; send/receive text messages; verify binary frame support",
+      "priority": "high",
+      "dependencies": ["10"],
+      "status": "pending"
+    },
+    {
+      "id": "16",
+      "title": "Implement WebSocket message parser",
+      "description": "Create JSON message parser and command router for WebSocket",
+      "details": "Parse incoming JSON with cJSON. Route by 'type' field: set_param, play, pause, stop, get_status, subscribe. Validate message format. Send error responses for invalid messages.",
+      "testStrategy": "Send various JSON commands, verify correct routing; test malformed JSON handling",
+      "priority": "high",
+      "dependencies": ["15"],
+      "status": "pending"
+    },
+    {
+      "id": "17",
+      "title": "Implement WebSocket client management",
+      "description": "Track connected clients and enable broadcasting",
+      "details": "Maintain array of client file descriptors (max 5). Add clients on connection, remove on disconnect. Implement broadcast function for events. Use httpd_ws_send_frame_async() for non-blocking sends.",
+      "testStrategy": "Connect 3 clients, verify all receive broadcasts; test client limit enforcement",
+      "priority": "medium",
+      "dependencies": ["15", "16"],
+      "status": "pending"
+    },
+    {
+      "id": "18",
+      "title": "Create execution engine task (prism_exec)",
+      "description": "Implement FreeRTOS task for pattern execution with command queue",
+      "details": "Create task with 8KB stack, priority tskIDLE_PRIORITY+5. Implement command queue (depth 16) for play/pause/stop commands. Main loop: check queue, update timeline, generate frame, output to LEDs at 60 FPS.",
+      "testStrategy": "Task starts and runs without stack overflow; verify 60 FPS timing; test command processing",
+      "priority": "high",
+      "dependencies": ["1"],
+      "status": "pending"
+    },
+    {
+      "id": "19",
+      "title": "Implement timeline player",
+      "description": "Create timeline-based pattern playback system",
+      "details": "Track current position in milliseconds using esp_timer_get_time(). Interpolate between keyframes. Support looping with seamless wraparound. Calculate frame data for current timestamp.",
+      "testStrategy": "Play 10-second pattern, verify correct position tracking; test loop wraparound",
+      "priority": "high",
+      "dependencies": ["18"],
+      "status": "pending"
+    },
+    {
+      "id": "20",
+      "title": "Implement curve interpolation",
+      "description": "Add smooth interpolation between pattern keyframes",
+      "details": "Support linear, ease-in, ease-out, ease-in-out curves. Use fixed-point math for efficiency. Implement cubic bezier for smooth transitions. Cache calculated values where possible.",
+      "testStrategy": "Verify interpolation produces smooth values; test all curve types; benchmark performance",
+      "priority": "medium",
+      "dependencies": ["19"],
+      "status": "pending"
+    },
+    {
+      "id": "21",
+      "title": "Implement palette manager",
+      "description": "Create color palette system for pattern rendering",
+      "details": "Load palette from pattern file TLV record. Support up to 256 colors. Implement HSV to RGB conversion. Add color mixing and blending functions.",
+      "testStrategy": "Load palette from test pattern; verify color conversions; test blending accuracy",
+      "priority": "medium",
+      "dependencies": ["19", "7"],
+      "status": "pending"
+    },
+    {
+      "id": "22",
+      "title": "Implement live parameter system",
+      "description": "Add real-time parameter modulation via WebSocket",
+      "details": "Support parameters: intensity, speed, hue_shift, saturation. Store in shared structure with mutex protection. Apply modulation during frame generation. Send updates to execution engine via queue.",
+      "testStrategy": "Change parameters via WebSocket, verify immediate effect; test thread safety",
+      "priority": "medium",
+      "dependencies": ["18", "16"],
+      "status": "pending"
+    },
+    {
+      "id": "23",
+      "title": "Implement playlist manager (prism_playlist)",
+      "description": "Create sequential playlist playback system",
+      "details": "Store playlist as array of UUIDs. Track current index. Implement next/previous navigation. Auto-advance on pattern completion. Support shuffle and repeat modes.",
+      "testStrategy": "Create 3-item playlist, verify sequential playback; test shuffle mode randomness",
+      "priority": "medium",
+      "dependencies": ["18", "19"],
+      "status": "pending"
+    },
+    {
+      "id": "24",
+      "title": "Implement play command endpoint",
+      "description": "Create POST /api/play handler for pattern playback",
+      "details": "Parse JSON body for uuid, start_ms, loop parameters. Send command to execution engine via queue. Return immediate response. Update playback status.",
+      "testStrategy": "Start playback via API, verify pattern plays; test with various start positions",
+      "priority": "high",
+      "dependencies": ["11", "18"],
+      "status": "pending"
+    },
+    {
+      "id": "25",
+      "title": "Implement status endpoint",
+      "description": "Create GET /api/status with comprehensive system information",
+      "details": "Return JSON with: playback state, current pattern, position, loop status, live parameters, storage usage, system uptime. Calculate storage from esp_littlefs_info().",
+      "testStrategy": "Query status during playback, verify all fields present and accurate",
+      "priority": "medium",
+      "dependencies": ["11", "18", "4"],
+      "status": "pending"
+    },
+    {
+      "id": "26",
+      "title": "Add mDNS service discovery",
+      "description": "Implement zero-configuration discovery with mDNS",
+      "details": "Initialize mDNS with mdns_init(). Set hostname 'prism-k1'. Advertise _https._tcp service on port 443. Add TXT records with version, capabilities.",
+      "testStrategy": "Verify device appears in mDNS browser; test discovery from multiple clients",
+      "priority": "low",
+      "dependencies": ["10"],
+      "status": "pending"
+    },
+    {
+      "id": "27",
+      "title": "Implement rate limiting",
+      "description": "Add upload rate limiting to prevent abuse",
+      "details": "Track requests per IP using hash table. Limit to 10 uploads per minute. Return 429 Too Many Requests when exceeded. Reset counters every minute using timer.",
+      "testStrategy": "Send 11 rapid uploads, verify 11th returns 429; test counter reset after timeout",
+      "priority": "medium",
+      "dependencies": ["12"],
+      "status": "pending"
+    },
+    {
+      "id": "28",
+      "title": "Implement concurrent upload limit",
+      "description": "Restrict simultaneous uploads to prevent resource exhaustion",
+      "details": "Use semaphore with count of 2. Take semaphore at upload start, release on completion/error. Return 503 Service Unavailable when limit reached.",
+      "testStrategy": "Start 3 concurrent uploads, verify 3rd returns 503; test semaphore release on error",
+      "priority": "medium",
+      "dependencies": ["12"],
+      "status": "pending"
+    },
+    {
+      "id": "29",
+      "title": "Add filesystem reconciliation",
+      "description": "Implement index rebuild on boot to handle corruption",
+      "details": "On startup, scan /prism directory for .prism files. For each file: validate header, extract metadata, rebuild index entry. Remove orphaned temp files from .upload directory.",
+      "testStrategy": "Corrupt index, reboot, verify index rebuilt correctly; test orphan cleanup",
+      "priority": "medium",
+      "dependencies": ["4", "7"],
+      "status": "pending"
+    },
+    {
+      "id": "30",
+      "title": "Implement power-loss recovery",
+      "description": "Add mechanisms to handle power loss during operations",
+      "details": "Use journaling for critical operations. Implement two-phase commit for uploads. Add recovery markers in NVS. Clean incomplete operations on boot.",
+      "testStrategy": "Simulate power loss during upload (unit test), verify cleanup on restart",
+      "priority": "medium",
+      "dependencies": ["4", "29"],
+      "status": "pending"
+    },
+    {
+      "id": "31",
+      "title": "Create unit tests for core modules",
+      "description": "Comprehensive unit tests for hash, TLV parser, and filesystem",
+      "details": "Test CRC32/SHA256 with NIST vectors. Test TLV parser with malformed data. Test filesystem atomic operations. Use Unity test framework. Run on host with ESP-IDF simulator.",
+      "testStrategy": "All unit tests pass; achieve >80% code coverage for core modules",
+      "priority": "high",
+      "dependencies": ["5", "7", "4"],
+      "status": "pending"
+    },
+    {
+      "id": "32",
+      "title": "Create integration tests",
+      "description": "End-to-end tests for upload, playback, and WebSocket flows",
+      "details": "Write shell scripts using curl and wscat. Test full upload flow with verification. Test pattern playback via API. Test WebSocket parameter updates. Include negative test cases.",
+      "testStrategy": "All integration tests pass; test on actual hardware with network",
+      "priority": "medium",
+      "dependencies": ["24", "12", "16"],
+      "status": "pending"
+    },
+    {
+      "id": "33",
+      "title": "Implement memory profiling",
+      "description": "Add heap monitoring and leak detection",
+      "details": "Use esp_get_free_heap_size() monitoring. Track heap before/after operations. Use heap_caps_check_integrity_all() for corruption detection. Log warnings when heap drops below threshold.",
+      "testStrategy": "Run stress test for 1 hour, verify no memory leaks; heap remains stable",
+      "priority": "medium",
+      "dependencies": ["31", "32"],
+      "status": "pending"
+    },
+    {
+      "id": "34",
+      "title": "Performance optimization",
+      "description": "Optimize hot paths and critical sections",
+      "details": "Profile with esp_timer functions. Optimize frame generation loop. Use DMA for LED output. Cache frequently accessed data. Reduce memory allocations in hot paths.",
+      "testStrategy": "Achieve 60 FPS frame generation; <100ms play command latency; >500KB/s upload speed",
+      "priority": "medium",
+      "dependencies": ["19", "20", "12"],
+      "status": "pending"
+    },
+    {
+      "id": "35",
+      "title": "Create comprehensive documentation",
+      "description": "Write README, API docs, and integration guide",
+      "details": "Document all REST endpoints with examples. Create WebSocket protocol specification. Write integration guide for clients. Include troubleshooting section. Add configuration guide.",
+      "testStrategy": "Documentation reviewed and validated; all examples tested and working",
+      "priority": "low",
+      "dependencies": ["32"],
+      "status": "pending"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# Task ID: 12
+# Title: Implement streaming upload handler
+# Status: pending
+# Dependencies: 11, 4, 5
+# Priority: high
+# Description: Create multipart upload handler with progress tracking and SHA256 verification
+# Details:
+Use httpd_req_recv() in chunks of 4KB. Write to temporary file in /prism/.upload/. Calculate SHA256 during upload. Verify against X-PRISM-SHA256 header. Atomic rename on success. Send progress via WebSocket if connected.
+
+# Test Strategy:
+Upload 50KB file, verify SHA256 matches; test interrupted upload cleanup; verify atomic commit

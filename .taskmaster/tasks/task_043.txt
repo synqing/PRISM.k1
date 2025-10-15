@@ -1,0 +1,11 @@
+# Task ID: 43
+# Title: Create monorepo structure
+# Status: pending
+# Dependencies: 38
+# Priority: low
+# Description: Organize code into monorepo with clear separation
+# Details:
+Structure: apps/studio/ (Tauri), firmware/ (ESP-IDF), libs/pattern/ (shared Rust), specs/ (documentation). Set up workspace Cargo.toml, shared dependencies, cross-compilation scripts.
+
+# Test Strategy:
+All components build independently, shared libs link correctly

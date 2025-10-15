@@ -1,0 +1,11 @@
+# Task ID: 28
+# Title: Implement concurrent upload limit
+# Status: pending
+# Dependencies: 12
+# Priority: medium
+# Description: Restrict simultaneous uploads to prevent resource exhaustion
+# Details:
+Use semaphore with count of 2. Take semaphore at upload start, release on completion/error. Return 503 Service Unavailable when limit reached.
+
+# Test Strategy:
+Start 3 concurrent uploads, verify 3rd returns 503; test semaphore release on error

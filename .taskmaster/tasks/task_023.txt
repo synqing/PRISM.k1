@@ -1,0 +1,11 @@
+# Task ID: 23
+# Title: Implement playlist manager (prism_playlist)
+# Status: pending
+# Dependencies: 18, 19
+# Priority: medium
+# Description: Create sequential playlist playback system
+# Details:
+Store playlist as array of UUIDs. Track current index. Implement next/previous navigation. Auto-advance on pattern completion. Support shuffle and repeat modes.
+
+# Test Strategy:
+Create 3-item playlist, verify sequential playback; test shuffle mode randomness

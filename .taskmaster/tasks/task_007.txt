@@ -1,0 +1,11 @@
+# Task ID: 7
+# Title: Implement binary file format parser for .prism files
+# Status: pending
+# Dependencies: 5, 6
+# Priority: high
+# Description: Create .prism file header validation and TLV record parser with bounds checking for the .prism format
+# Details:
+Validate .prism format magic bytes 'PRISM\x00\x00\x00', version check, CRC32 header verification. Implement safe TLV parser with: bounds checking, maximum length validation, safe memory allocation. Support record types 0x0001-0x0005. This handles the .prism format (device runtime format), not the .k1p legacy format.
+
+# Test Strategy:
+Test with malformed headers, oversized TLV records, corrupted CRC32; verify parser rejects invalid files safely

@@ -1,0 +1,11 @@
+# Task ID: 9
+# Title: Generate self-signed certificate for HTTPS
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Create and embed self-signed certificate for HTTPS server
+# Details:
+Generate 2048-bit RSA certificate with: openssl req -x509 -newkey rsa:2048 -keyout server_key.pem -out server_cert.pem -days 365 -nodes. Embed as string literals in prism_http.c. Consider future certificate provisioning mechanism.
+
+# Test Strategy:
+Verify certificate loads correctly; test HTTPS connection with curl -k; check certificate details with openssl x509

@@ -1,0 +1,11 @@
+# Task ID: 29
+# Title: Add filesystem reconciliation
+# Status: pending
+# Dependencies: 4, 7
+# Priority: medium
+# Description: Implement index rebuild on boot to handle corruption
+# Details:
+On startup, scan /prism directory for .prism files. For each file: validate header, extract metadata, rebuild index entry. Remove orphaned temp files from .upload directory.
+
+# Test Strategy:
+Corrupt index, reboot, verify index rebuilt correctly; test orphan cleanup

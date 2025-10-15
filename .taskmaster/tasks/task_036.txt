@@ -1,0 +1,11 @@
+# Task ID: 36
+# Title: Create walking skeleton WebSocket MVP
+# Status: pending
+# Dependencies: 1, 2, 3
+# Priority: high
+# Description: Build minimal end-to-end proof: WebSocket upload, LittleFS storage, immediate playback
+# Details:
+Create single main.cpp with: esp_http_server WebSocket at /ws, PUT_BEGIN/PUT_DATA/PUT_END protocol, write to LittleFS temp file, atomic rename on completion, PLAY command. Skip complex validation, just prove flow works. Use their provided code as base.
+
+# Test Strategy:
+Upload 10KB test pattern via wscat, verify file stored, PLAY command returns success

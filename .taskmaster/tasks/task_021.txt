@@ -1,0 +1,11 @@
+# Task ID: 21
+# Title: Implement palette manager
+# Status: pending
+# Dependencies: 19, 7
+# Priority: medium
+# Description: Create color palette system for pattern rendering
+# Details:
+Load palette from pattern file TLV record. Support up to 256 colors. Implement HSV to RGB conversion. Add color mixing and blending functions.
+
+# Test Strategy:
+Load palette from test pattern; verify color conversions; test blending accuracy

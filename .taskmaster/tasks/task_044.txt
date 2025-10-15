@@ -1,0 +1,11 @@
+# Task ID: 44
+# Title: Implement pattern storage UI
+# Status: pending
+# Dependencies: 42
+# Priority: medium
+# Description: Show stored patterns on device with management controls
+# Details:
+List patterns with sizes, show storage usage bar, delete patterns, reorder for playlist. Use their LIST/DELETE WebSocket commands.
+
+# Test Strategy:
+List shows all patterns, delete removes from device, storage bar accurate

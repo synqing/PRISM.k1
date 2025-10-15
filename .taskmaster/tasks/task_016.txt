@@ -1,0 +1,11 @@
+# Task ID: 16
+# Title: Implement WebSocket message parser
+# Status: pending
+# Dependencies: 15
+# Priority: high
+# Description: Create JSON message parser and command router for WebSocket
+# Details:
+Parse incoming JSON with cJSON. Route by 'type' field: set_param, play, pause, stop, get_status, subscribe. Validate message format. Send error responses for invalid messages.
+
+# Test Strategy:
+Send various JSON commands, verify correct routing; test malformed JSON handling

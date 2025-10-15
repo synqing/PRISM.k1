@@ -1,0 +1,11 @@
+# Task ID: 2
+# Title: Configure partition table with LittleFS
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Create custom partition table with dedicated LittleFS partition for pattern storage
+# Details:
+Create partitions.csv with: nvs (0x9000, 24KB), otadata (0xF000, 8KB), app0 (0x11000, 1.5MB), app1 (0x181000, 1.5MB), prismfs data 0x82 (0x2F1000, 1MB). Set CONFIG_PARTITION_TABLE_CUSTOM=y in sdkconfig.defaults.
+
+# Test Strategy:
+Run idf.py partition-table to verify partition layout; ensure prismfs partition is correctly sized at 1MB

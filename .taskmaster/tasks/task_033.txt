@@ -1,0 +1,11 @@
+# Task ID: 33
+# Title: Implement memory profiling
+# Status: pending
+# Dependencies: 31, 32
+# Priority: medium
+# Description: Add heap monitoring and leak detection
+# Details:
+Use esp_get_free_heap_size() monitoring. Track heap before/after operations. Use heap_caps_check_integrity_all() for corruption detection. Log warnings when heap drops below threshold.
+
+# Test Strategy:
+Run stress test for 1 hour, verify no memory leaks; heap remains stable

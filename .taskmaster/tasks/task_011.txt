@@ -1,0 +1,11 @@
+# Task ID: 11
+# Title: Implement REST endpoint routing
+# Status: pending
+# Dependencies: 10
+# Priority: high
+# Description: Create URI handlers for all REST endpoints with proper HTTP methods
+# Details:
+Register handlers: POST /api/patterns (upload), GET /api/patterns (list), DELETE /api/patterns/:id (delete), POST /api/play (play), POST /api/playlist (playlist), GET /api/status (status). Use httpd_register_uri_handler() for each.
+
+# Test Strategy:
+Each endpoint responds with correct status code; test with curl for all HTTP methods

@@ -1,0 +1,11 @@
+# Task ID: 24
+# Title: Implement play command endpoint
+# Status: pending
+# Dependencies: 11, 18
+# Priority: high
+# Description: Create POST /api/play handler for pattern playback
+# Details:
+Parse JSON body for uuid, start_ms, loop parameters. Send command to execution engine via queue. Return immediate response. Update playback status.
+
+# Test Strategy:
+Start playback via API, verify pattern plays; test with various start positions

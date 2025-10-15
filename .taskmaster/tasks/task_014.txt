@@ -1,0 +1,11 @@
+# Task ID: 14
+# Title: Implement pattern delete endpoint
+# Status: pending
+# Dependencies: 11, 4
+# Priority: medium
+# Description: Create DELETE handler with index cleanup
+# Details:
+Parse UUID from URI path. Check file exists. Delete file with prism_fs_delete(). Update index to remove entry. Return 404 if not found, 200 on success.
+
+# Test Strategy:
+Delete existing pattern, verify file removed and index updated; test deleting non-existent returns 404

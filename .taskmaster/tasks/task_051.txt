@@ -1,0 +1,11 @@
+# Task ID: 51
+# Title: Implement template-to-timeline conversion
+# Status: pending
+# Dependencies: 47, 41
+# Priority: medium
+# Description: Allow users to open templates in timeline editor for customization
+# Details:
+Add 'Edit Template' button that loads template into timeline editor. User can modify clips, timing, palettes, then save as custom pattern. This bridges gap between templates (easy) and timeline editor (powerful). Preserve template metadata when loading. Consider 'Save as Template' to let users share creations.
+
+# Test Strategy:
+Open template in editor, modify it, save as custom pattern, deploy to device, verify changes applied
