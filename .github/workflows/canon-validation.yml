@@ -86,7 +86,7 @@ jobs:
 
   build-firmware:
     name: Build Firmware
-    needs: validate-canon
+    needs: parser-testbed
     runs-on: ubuntu-latest
 
     steps:
@@ -98,3 +98,30 @@ jobs:
           echo "Firmware build would run here"
           echo "Only proceeds if CANON validation passed"
           # Actual ESP-IDF build commands would go here
+
+  parser-testbed:
+    name: Parser Harness Regression
+    needs: validate-canon
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run parser harness targets
+        run: |
+          VECTOR_DIR=$(mktemp -d)
+          REPORT_PATH="$VECTOR_DIR/report.json"
+          echo "Using VECTOR_DIR=$VECTOR_DIR"
+          make vectors VECTOR_DIR=$VECTOR_DIR
+          make regress VECTOR_DIR=$VECTOR_DIR REPORT=$REPORT_PATH
+          echo "Regression report:"
+          cat "$REPORT_PATH"
