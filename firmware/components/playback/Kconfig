@@ -1,0 +1,11 @@
+menu "PRISM Playback Configuration"
+
+config PRISM_PROFILE_TEMPORAL
+    bool "Enable temporal profiling"
+    default n
+    help
+        Enable cycle-accurate profiling of temporal calculations.
+        Adds small code size overhead. Disable in production.
+
+endmenu
+

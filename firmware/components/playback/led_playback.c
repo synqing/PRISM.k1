@@ -7,6 +7,8 @@
 #include "led_driver.h"
 #include "esp_log.h"
 #include "prism_wave_tables.h"
+#include "esp_attr.h"
+#include "esp_cpu.h"
 #include <string.h>
 
 // Built-in effect IDs (initial set)
@@ -26,6 +28,38 @@ typedef struct {
 static playback_state_t s_pb = {0};
 // Precomputed spatial phase per LED (0-255 over LED_COUNT_PER_CH)
 static uint8_t s_phase_per_led[LED_COUNT_PER_CH];
+
+#ifdef CONFIG_PRISM_PROFILE_TEMPORAL
+typedef struct {
+    uint32_t total_cycles;
+    uint32_t min_cycles;
+    uint32_t max_cycles;
+    uint32_t samples;
+} wave_prof_accum_t;
+
+static wave_prof_accum_t s_prof_wave = {0};
+
+static inline uint32_t wave_prof_begin(void) {
+    return esp_cpu_get_cycle_count();
+}
+
+static inline void wave_prof_end(uint32_t start)
+{
+    uint32_t end = esp_cpu_get_cycle_count();
+    uint32_t cycles = end - start;
+    if (s_prof_wave.samples == 0 || cycles < s_prof_wave.min_cycles) {
+        s_prof_wave.min_cycles = cycles;
+    }
+    if (cycles > s_prof_wave.max_cycles) {
+        s_prof_wave.max_cycles = cycles;
+    }
+    s_prof_wave.total_cycles += cycles;
+    s_prof_wave.samples++;
+}
+#else
+#define wave_prof_begin() (0)
+#define wave_prof_end(start) do { (void)(start); } while(0)
+#endif
 
 esp_err_t playback_init(void) {
     ESP_LOGI(TAG, "Initializing playback subsystem (120 FPS target)...");
@@ -53,6 +87,7 @@ void playback_task(void *pvParameters) {
             // Minimal built-in effects (fast, integer math)
             switch (s_pb.effect_id) {
                 case EFFECT_WAVE_SINGLE: {
+                    uint32_t t0 = wave_prof_begin();
                     // LUT-based sinusoidal green wave across strip using sin8_table
                     // Params: [0]=amplitude (0-255), [1]=speed (phase inc per frame)
                     uint8_t amp = (s_pb.param_count >= 1) ? s_pb.params[0] : 255;
@@ -71,6 +106,7 @@ void playback_task(void *pvParameters) {
                         frame_ch2[i * 3 + 1] = 0;   // R
                         frame_ch2[i * 3 + 2] = 0;   // B
                     }
+                    wave_prof_end(t0);
                     break;
                 }
                 case EFFECT_PALETTE_CYCLE:
