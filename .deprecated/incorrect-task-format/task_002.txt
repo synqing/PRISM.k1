@@ -1,0 +1,102 @@
+# Task ID: 002
+# Title: Configure partition table with LittleFS
+# Status: pending
+# Dependencies: 001
+# Priority: high
+# CANON ADRs: ADR-001, ADR-005
+# CANON Validated: 2025-10-15
+
+## Description
+Create custom partition table with OTA-enabled dual-app configuration and dedicated LittleFS partition for pattern storage. This is CRITICAL - must use EXACT values from ADR-001.
+
+## CANON Specifications
+```yaml
+# ADR-001: Partition Table (AUTHORITATIVE)
+partition_table: |
+  # Name,   Type, SubType, Offset,   Size,     Flags
+  nvs,      data, nvs,     0x9000,   0x6000,   # 24KB - Settings
+  otadata,  data, ota,     0xF000,   0x2000,   # 8KB - OTA metadata
+  app0,     app,  ota_0,   0x11000,  0x180000, # 1.5MB - Primary app
+  app1,     app,  ota_1,   0x191000, 0x180000, # 1.5MB - OTA app
+  littlefs, data, 0x82,    0x311000, 0x180000, # 1.5MB - Pattern storage
+
+# Critical Constants
+littlefs_size: 1572864      # 1.5MB = 0x180000 (NOT 1MB!)
+littlefs_offset: 0x311000   # Fixed address
+littlefs_subtype: 0x82      # LittleFS identifier
+total_used: 4558336         # 4.35MB of 8MB flash
+unused_flash: 3830272       # 3.65MB reserved
+
+# ADR-005: Storage Path
+storage_mount_path: "/littlefs"  # NOT "/prism"
+storage_label: "littlefs"
+```
+
+## Details
+Create `firmware/partitions.csv` with EXACT partition layout from ADR-001. The partition table is OTA-enabled with dual apps for firmware updates.
+
+**CRITICAL CORRECTIONS from old tasks:**
+- LittleFS size: **1.5MB (0x180000)** NOT 1MB
+- LittleFS offset: **0x311000** (calculated to avoid overlap)
+- Mount path: **/littlefs** NOT /prism (ADR-005)
+- Label: **littlefs** (matches mount path convention)
+
+## Test Strategy
+1. Run `idf.py partition-table` to verify layout
+2. Verify littlefs partition shows exactly **0x180000 (1572864 bytes)**
+3. Verify offset **0x311000** is correct
+4. Check total partition size fits within 8MB flash
+5. Confirm no overlaps between partitions
+6. Validate subtype 0x82 for littlefs recognized
+
+## Agent Guidance
+Step-by-step execution:
+
+1. **Create firmware/partitions.csv with EXACT ADR-001 values:**
+   ```csv
+   # Name,   Type, SubType, Offset,   Size,     Flags
+   nvs,      data, nvs,     0x9000,   0x6000,
+   otadata,  data, ota,     0xF000,   0x2000,
+   app0,     app,  ota_0,   0x11000,  0x180000,
+   app1,     app,  ota_1,   0x191000, 0x180000,
+   littlefs, data, 0x82,    0x311000, 0x180000,
+   ```
+
+2. **Verify partition table:**
+   ```bash
+   cd firmware
+   idf.py partition-table
+   ```
+
+3. **Expected output validation:**
+   - littlefs partition at offset 0x311000
+   - Size: 0x180000 (1572864 bytes = 1.5MB)
+   - SubType: 0x82
+   - Total flash usage under 8MB
+
+4. **Double-check calculations:**
+   ```
+   app1 end: 0x191000 + 0x180000 = 0x311000 (littlefs start) ✓
+   littlefs end: 0x311000 + 0x180000 = 0x491000
+   Total used: 0x491000 = 4,788,224 bytes (~4.56MB) ✓
+   ```
+
+5. **Update sdkconfig.defaults if not set:**
+   ```
+   CONFIG_PARTITION_TABLE_CUSTOM=y
+   CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+   ```
+
+6. **Rebuild to apply:**
+   ```bash
+   idf.py fullclean
+   idf.py build
+   ```
+
+## Success Criteria
+- [x] partitions.csv created with EXACT ADR-001 values
+- [x] Partition table validation passes
+- [x] littlefs partition is **1.5MB (0x180000)** at **0x311000**
+- [x] No partition overlaps or errors
+- [x] Build system recognizes custom partition table
+- [x] Storage path will be **/littlefs** per ADR-005

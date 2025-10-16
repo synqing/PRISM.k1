@@ -1,0 +1,81 @@
+# Task ID: 003
+# Title: Add LittleFS managed component
+# Status: pending
+# Dependencies: 001
+# Priority: high
+# CANON ADRs: ADR-001, ADR-005
+# CANON Validated: 2025-10-15
+
+## Description
+Integrate joltwallet/littlefs as managed component using ESP-IDF Component Manager. This provides the filesystem layer for pattern storage.
+
+## CANON Specifications
+```yaml
+# Filesystem Configuration
+component: "joltwallet/littlefs"
+version: ">=1.20.1"
+storage_mount_path: "/littlefs"  # ADR-005
+partition_label: "littlefs"      # ADR-001
+partition_size: 1572864          # 1.5MB (ADR-001)
+```
+
+## Details
+Add joltwallet/littlefs dependency to idf_component.yml. Run idf.py reconfigure to fetch the component. Verify component downloaded to managed_components directory.
+
+The LittleFS component will mount the partition at **/littlefs** (per ADR-005), NOT /prism.
+
+## Test Strategy
+1. Check `managed_components/joltwallet__littlefs` exists after reconfigure
+2. Verify CMake finds the component during build
+3. Check component version matches requirement
+4. Verify no dependency conflicts
+5. Ensure build system includes littlefs headers
+
+## Agent Guidance
+Step-by-step execution:
+
+1. **Update firmware/main/idf_component.yml:**
+   ```yaml
+   dependencies:
+     idf: ">=5.0"
+     joltwallet/littlefs: "^1.20.1"
+   ```
+
+2. **Fetch managed component:**
+   ```bash
+   cd firmware
+   idf.py reconfigure
+   ```
+
+3. **Verify component downloaded:**
+   ```bash
+   ls -la managed_components/
+   # Should show: joltwallet__littlefs/
+   ```
+
+4. **Check component detection:**
+   ```bash
+   idf.py build
+   # Look for littlefs in component list
+   ```
+
+5. **Verify include paths:**
+   ```bash
+   grep -r "littlefs" build/compile_commands.json
+   # Should show littlefs include paths
+   ```
+
+6. **Add mount path documentation in code:**
+   ```c
+   // In main.c or storage component
+   #define STORAGE_MOUNT_PATH "/littlefs"  // ADR-005
+   #define STORAGE_LABEL "littlefs"         // ADR-001
+   ```
+
+## Success Criteria
+- [x] joltwallet__littlefs component in managed_components/
+- [x] CMake detects and includes component
+- [x] Build succeeds with littlefs linked
+- [x] Component version >=1.20.1
+- [x] Documentation references **/littlefs** mount path (ADR-005)
+- [x] Partition label matches "littlefs" (ADR-001)

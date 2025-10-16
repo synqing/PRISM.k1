@@ -1,0 +1,184 @@
+#!/usr/bin/env node
+// Multi-Agent Smart Router - Intelligent Task Assignment
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const PROJECT_ROOT = '/Users/spectrasynq/Workspace_Management/Software/PRISM.k1';
+
+class TaskRouter {
+    constructor() {
+        this.capabilities = this.loadCapabilities();
+        this.load = this.initializeLoad();
+    }
+    
+    loadCapabilities() {
+        const capPath = path.join(PROJECT_ROOT, 'multi-agent/config/agents.yml');
+        
+        if (!fs.existsSync(capPath)) {
+            console.error('❌ Agent capabilities file not found');
+            process.exit(1);
+        }
+        
+        // Simple YAML parsing for our structure
+        const content = fs.readFileSync(capPath, 'utf8');
+        const agents = {};
+        
+        // Extract agent definitions (simplified YAML parsing)
+        const agentMatches = content.matchAll(/agent-\d+-\w+:/g);
+        for (const match of agentMatches) {
+            const agentId = match[0].replace(':', '');
+            agents[agentId] = {
+                skills: [],
+                maxConcurrentTasks: 2,
+                priorityBoost: [],
+                researchEnabled: true
+            };
+        }
+        
+        return agents;
+    }
+    
+    initializeLoad() {
+        const load = {};
+        Object.keys(this.capabilities).forEach(agent => {
+            load[agent] = 0;
+        });
+        return load;
+    }
+    
+    updateLoad() {
+        // Count active tasks per agent from lock files
+        const locksDir = path.join(PROJECT_ROOT, 'multi-agent/.locks');
+        
+        Object.keys(this.load).forEach(agent => {
+            this.load[agent] = 0;
+        });
+        
+        try {
+            if (fs.existsSync(locksDir)) {
+                const claims = fs.readdirSync(locksDir)
+                    .filter(f => f.endsWith('.claim'));
+                
+                claims.forEach(claim => {
+                    const content = fs.readFileSync(path.join(locksDir, claim), 'utf8');
+                    const agent = content.split(':')[0];
+                    if (this.load[agent] !== undefined) {
+                        this.load[agent]++;
+                    }
+                });
+            }
+        } catch (err) {
+            // Directory might not exist yet
+        }
+    }
+    
+    async assignTask(task) {
+        this.updateLoad();
+        
+        const scores = Object.entries(this.capabilities).map(([agentId, caps]) => {
+            let score = 0;
+            
+            // Skill match (10 points per matching skill)
+            const taskTags = task.tags || [];
+            score += taskTags.filter(t => caps.skills?.includes(t)).length * 10;
+            
+            // Priority boost (5 points)
+            if (caps.priorityBoost?.includes(task.priority)) score += 5;
+            
+            // Workload penalty (2 points per active task)
+            score -= this.load[agentId] * 2;
+            
+            // Critical path bonus (15 points)
+            if (caps.criticalPath && task.priority === 'high') score += 15;
+            
+            // Research capability (8 points)
+            if (task.needsResearch && caps.researchEnabled) score += 8;
+            
+            // Avoid overload (max tasks limit)
+            if (this.load[agentId] >= caps.maxConcurrentTasks) score -= 100;
+            
+            return { agentId, score, load: this.load[agentId] };
+        });
+        
+        // Sort by score, descending
+        scores.sort((a, b) => b.score - a.score);
+        
+        return scores[0];
+    }
+    
+    async getRecommendations(numTasks = 10) {
+        // Get pending tasks from taskmaster
+        let tasks = [];
+        
+        try {
+            const tasksPath = path.join(PROJECT_ROOT, '.taskmaster/tasks/tasks.json');
+            if (fs.existsSync(tasksPath)) {
+                const tasksData = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
+                tasks = tasksData.tasks?.filter(t => t.status === 'pending') || [];
+            }
+        } catch (err) {
+            console.error('❌ Could not read tasks:', err.message);
+            return [];
+        }
+        
+        const recommendations = [];
+        
+        for (const task of tasks.slice(0, numTasks)) {
+            const assignment = await this.assignTask(task);
+            recommendations.push({
+                taskId: task.id,
+                taskTitle: task.title,
+                assignedTo: assignment.agentId,
+                score: assignment.score,
+                currentLoad: assignment.load
+            });
+        }
+        
+        return recommendations;
+    }
+}
+
+// CLI interface
+async function main() {
+    const router = new TaskRouter();
+    
+    const command = process.argv[2];
+    
+    if (command === 'recommend') {
+        const count = parseInt(process.argv[3]) || 10;
+        const recs = await router.getRecommendations(count);
+        
+        if (recs.length === 0) {
+            console.log('No pending tasks found');
+        } else {
+            console.log(JSON.stringify(recs, null, 2));
+        }
+    } else if (command === 'status') {
+        router.updateLoad();
+        console.log('Current Agent Load:');
+        Object.entries(router.load).forEach(([agent, load]) => {
+            console.log(`  ${agent}: ${load} tasks`);
+        });
+    } else {
+        console.log('Multi-Agent Smart Router');
+        console.log('');
+        console.log('Usage:');
+        console.log('  smart-router.js recommend [count]    - Get top N task assignments');
+        console.log('  smart-router.js status               - Show current agent load');
+        console.log('');
+        console.log('Examples:');
+        console.log('  ./smart-router.js recommend 10');
+        console.log('  ./smart-router.js status');
+    }
+}
+
+if (require.main === module) {
+    main().catch(err => {
+        console.error('Error:', err.message);
+        process.exit(1);
+    });
+}
+
+module.exports = TaskRouter;

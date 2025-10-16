@@ -8,6 +8,11 @@
 
 #include "storage_protocol.h"
 #include "pattern_storage.h"
+#include "prism_parser.h"
+
+#ifndef PRISM_STRICT_PRISM_VALIDATION
+#define PRISM_STRICT_PRISM_VALIDATION 1
+#endif
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -180,6 +185,38 @@ static esp_err_t handle_put_end(const uint8_t *value, uint16_t value_len,
     // Note: In a real implementation, PUT_CHUNK would accumulate data in a buffer,
     // and PUT_END would write the complete pattern. For now, this is a simplified
     // stub that demonstrates the error handling flow.
+
+    // If final data is present, attempt header and CRC validation for .prism
+    if (value && value_len >= sizeof(prism_header_v10_t)) {
+        const prism_header_v10_t *hdr10 = (const prism_header_v10_t *)value;
+        if (memcmp(hdr10->magic, PRISM_MAGIC, 4) == 0) {
+            prism_header_v11_t parsed;
+            esp_err_t perr = parse_prism_header(value, value_len, &parsed);
+            if (perr != ESP_OK) {
+                #if PRISM_STRICT_PRISM_VALIDATION
+                ESP_LOGE(TAG, "PUT_END: invalid .prism header (%s)", esp_err_to_name(perr));
+                response[0] = CMD_ERROR;
+                response[1] = ERR_INVALID_TLV;
+                *response_len = 2;
+                g_upload_session.active = false;
+                return perr;
+                #else
+                ESP_LOGW(TAG, "PUT_END: header parse failed (%s), continuing", esp_err_to_name(perr));
+                #endif
+            } else {
+                uint32_t calc = calculate_header_crc(&parsed);
+                if (calc != parsed.base.crc32) {
+                    ESP_LOGE(TAG, "PUT_END: header CRC mismatch (calc=0x%08lX stored=0x%08lX)",
+                             (unsigned long)calc, (unsigned long)parsed.base.crc32);
+                    response[0] = CMD_ERROR;
+                    response[1] = ERR_INVALID_TLV;
+                    *response_len = 2;
+                    g_upload_session.active = false;
+                    return ESP_ERR_INVALID_CRC;
+                }
+            }
+        }
+    }
 
     // Simulate storage operation (placeholder)
     // In real implementation: storage_pattern_create(g_upload_session.pattern_id, accumulated_data, total_size)

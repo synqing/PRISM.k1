@@ -1,0 +1,39 @@
+# Multi-Agent System - Build & Test Pipeline
+
+stages:
+  pre_integration:
+    trigger: task-completed
+    checks:
+      - name: compile-check
+        command: cd firmware && idf.py build --dry-run
+        required: true
+      - name: canon-validation
+        command: .taskmaster/scripts/validate-canon.sh
+        required: true
+      - name: memory-estimate
+        command: .multi-agent/scripts/estimate-memory.sh
+        required: false
+    
+  integration:
+    trigger: branch-merge
+    checks:
+      - name: full-build
+        command: cd firmware && idf.py fullclean && idf.py build
+        required: true
+      - name: unit-tests
+        command: cd firmware && idf.py test
+        required: false
+    
+  post_integration:
+    trigger: tests-passed
+    actions:
+      - name: update-docs
+        command: .multi-agent/scripts/generate-docs.sh
+      - name: collect-metrics
+        command: .multi-agent/scripts/collect-metrics.sh
+
+auto_rollback:
+  enabled: true
+  on_failure: [build-failure, validation-failure]
+  preserve_logs: true
+  notify: captain

@@ -3,8 +3,10 @@ idf_component_register(
         "pattern_storage.c"
         "pattern_storage_crud.c"
         "storage_protocol.c"
+        "prism_parser.c"
     INCLUDE_DIRS "include"
     REQUIRES
+        playback
         freertos
         esp_partition
         core

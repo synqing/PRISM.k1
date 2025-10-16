@@ -1,0 +1,47 @@
+# Task ID: 010
+# Title: Initialize HTTPS server (prism_http)
+# Status: pending
+# Dependencies: 009
+# Priority: high
+# CANON ADRs: ADR-002
+# CANON Validated: 2025-10-15
+
+## Description
+Set up esp_https_server with embedded certificate and configuration supporting WebSocket connections.
+
+## CANON Specifications
+```yaml
+# HTTPS Server Configuration (ADR-002 alignment)
+port: 443
+max_uri_handlers: 20
+max_open_sockets: 7
+stack_size: 8192
+ws_supported: true           # WebSocket endpoint at /ws
+ws_max_clients: 2           # ADR-002
+ws_buffer_size: 4096        # ADR-002 (4KB NOT 8KB)
+```
+
+## Details
+Use httpd_ssl_config_t with HTTPD_SSL_CONFIG_DEFAULT(). Set server_cert and server_key from embedded strings. Configure max_open_sockets=7 to support HTTP + WebSocket clients. WebSocket will use 4KB buffer per ADR-002.
+
+## Test Strategy
+1. Server starts successfully on port 443
+2. curl -k https://device-ip/ returns connection
+3. Check memory usage <10KB
+4. Verify WebSocket upgrade works
+5. Test with 2 concurrent WebSocket clients (ADR-002 limit)
+
+## Agent Guidance
+1. Create network/https_server.c
+2. Use esp_https_server with SSL config
+3. Set embedded cert and key
+4. Configure: max_open_sockets=7, stack_size=8192
+5. Add health endpoint for smoke test
+6. Export router registration API
+
+## Success Criteria
+- [x] HTTPS server starts on port 443
+- [x] SSL certificate loads correctly
+- [x] Supports up to 2 WebSocket clients (ADR-002)
+- [x] Memory usage acceptable
+- [x] Health endpoint responds

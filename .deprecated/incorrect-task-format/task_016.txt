@@ -1,0 +1,50 @@
+# Task ID: 016
+# Title: Implement WebSocket message parser
+# Status: pending
+# Dependencies: 015
+# Priority: high
+# CANON ADRs: ADR-002
+# CANON Validated: 2025-10-15
+
+## Description
+Create JSON message parser and command router for WebSocket with 4KB buffer constraint.
+
+## CANON Specifications
+```yaml
+# ADR-002: WebSocket Buffer Constraint
+ws_buffer_size: 4096        # 4KB max per message
+message_format: JSON
+commands:
+  - set_param
+  - play
+  - pause
+  - stop
+  - get_status
+  - subscribe
+validation: required
+error_responses: true
+```
+
+## Details
+Parse incoming JSON with cJSON within 4KB buffer limit. Route by 'type' field. Validate message format. Send error responses for invalid messages. Ensure messages fit within 4KB limit per ADR-002.
+
+## Test Strategy
+1. Send valid JSON commands, verify routing
+2. Test malformed JSON handling
+3. **Test messages approaching 4KB limit**
+4. Verify error responses sent correctly
+5. Test all command types
+
+## Agent Guidance
+1. Create protocol_parser.c
+2. Define message schema (within 4KB)
+3. Route by 'type' field
+4. Validate all required fields
+5. Return structured errors
+6. Expose callbacks to playback/storage
+
+## Success Criteria
+- [x] All commands route correctly
+- [x] Messages within 4KB buffer (ADR-002)
+- [x] Invalid messages handled gracefully
+- [x] Error responses work

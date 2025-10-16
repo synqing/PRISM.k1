@@ -1,0 +1,169 @@
+# Task ID: 004
+# Title: Implement core filesystem operations (prism_fs)
+# Status: pending
+# Dependencies: 002, 003
+# Priority: high
+# CANON ADRs: ADR-001, ADR-004, ADR-005, ADR-006
+# CANON Validated: 2025-10-15
+
+## Description
+Create filesystem abstraction layer with LittleFS mounting, atomic operations, and index management. All paths use **/littlefs** mount point per ADR-005.
+
+## CANON Specifications
+```yaml
+# ADR-005: Storage Configuration (CRITICAL)
+storage_mount_path: "/littlefs"   # NOT "/prism" - CANON override
+storage_type: "littlefs"
+storage_label: "littlefs"         # ADR-001
+
+# ADR-001: Partition
+partition_size: 1572864           # 1.5MB
+partition_offset: 0x311000
+
+# ADR-004 + ADR-006: Pattern Constraints
+pattern_max_size: 262144          # 256KB
+pattern_min_count: 15             # NOT 25 (ADR-006 supersedes)
+storage_reserved: 102400          # 100KB safety
+
+# Filesystem Paths
+index_path: "/littlefs/.index.json"
+upload_dir: "/littlefs/.upload"
+patterns_dir: "/littlefs/patterns"
+templates_dir: "/littlefs/templates"
+```
+
+## Details
+Implement prism_fs_init() with esp_vfs_littlefs_register() with format_if_mount_failed=true. Create atomic commit pattern: write to .tmp file, fsync, rename. Implement index operations using cJSON for metadata storage at **/littlefs/.index.json**.
+
+**CRITICAL PATH CORRECTION:** ALL file paths MUST use **/littlefs** prefix, NOT **/prism**. This is a CANON requirement from ADR-005.
+
+Create directory structure:
+- /littlefs/.upload/ - temporary upload staging
+- /littlefs/patterns/ - user patterns
+- /littlefs/templates/ - preloaded templates
+- /littlefs/.index.json - metadata index
+
+## Test Strategy
+1. Unit test: mount/unmount cycle succeeds
+2. Create file at /littlefs/test.dat, verify it exists
+3. Test atomic rename: write to .tmp, rename to final
+4. Verify index loads/saves correctly
+5. Test directory creation for all paths
+6. Verify format_if_mount_failed creates filesystem on first boot
+
+## Agent Guidance
+Step-by-step execution:
+
+1. **Create storage component structure:**
+   ```bash
+   mkdir -p firmware/components/storage/include
+   ```
+
+2. **Create include/prism_fs.h:**
+   ```c
+   #ifndef PRISM_FS_H
+   #define PRISM_FS_H
+
+   #include "esp_err.h"
+
+   // ADR-005: Mount path MUST be /littlefs
+   #define STORAGE_MOUNT_PATH "/littlefs"
+   #define STORAGE_LABEL "littlefs"
+
+   // ADR-004 + ADR-006: Pattern limits
+   #define PATTERN_MAX_SIZE 262144    // 256KB
+   #define PATTERN_MIN_COUNT 15       // NOT 25
+   #define STORAGE_RESERVED 102400    // 100KB
+
+   // Filesystem paths (all use /littlefs)
+   #define FS_INDEX_PATH      "/littlefs/.index.json"
+   #define FS_UPLOAD_DIR      "/littlefs/.upload"
+   #define FS_PATTERNS_DIR    "/littlefs/patterns"
+   #define FS_TEMPLATES_DIR   "/littlefs/templates"
+
+   esp_err_t prism_fs_init(void);
+   esp_err_t prism_fs_atomic_write(const char *path, const void *data, size_t len);
+   esp_err_t prism_fs_delete(const char *path);
+   esp_err_t prism_index_load(void);
+   esp_err_t prism_index_save(void);
+
+   #endif
+   ```
+
+3. **Implement storage/prism_fs.c:**
+   ```c
+   #include "prism_fs.h"
+   #include "esp_littlefs.h"
+   #include "esp_log.h"
+   #include <sys/stat.h>
+   #include <string.h>
+
+   static const char *TAG = "prism_fs";
+
+   esp_err_t prism_fs_init(void) {
+       ESP_LOGI(TAG, "Mounting LittleFS at %s", STORAGE_MOUNT_PATH);
+
+       esp_vfs_littlefs_conf_t conf = {
+           .base_path = STORAGE_MOUNT_PATH,
+           .partition_label = STORAGE_LABEL,
+           .format_if_mount_failed = true,
+           .dont_mount = false,
+       };
+
+       esp_err_t ret = esp_vfs_littlefs_register(&conf);
+       if (ret != ESP_OK) {
+           ESP_LOGE(TAG, "Failed to mount: %s", esp_err_to_name(ret));
+           return ret;
+       }
+
+       // Create required directories
+       mkdir(FS_UPLOAD_DIR, 0755);
+       mkdir(FS_PATTERNS_DIR, 0755);
+       mkdir(FS_TEMPLATES_DIR, 0755);
+
+       ESP_LOGI(TAG, "LittleFS mounted successfully");
+       return ESP_OK;
+   }
+
+   esp_err_t prism_fs_atomic_write(const char *path, const void *data, size_t len) {
+       char tmp_path[256];
+       snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+
+       FILE *f = fopen(tmp_path, "wb");
+       if (!f) return ESP_FAIL;
+
+       fwrite(data, 1, len, f);
+       fflush(f);
+       fsync(fileno(f));
+       fclose(f);
+
+       return (rename(tmp_path, path) == 0) ? ESP_OK : ESP_FAIL;
+   }
+   ```
+
+4. **Add CMakeLists.txt:**
+   ```cmake
+   idf_component_register(
+       SRCS "prism_fs.c"
+       INCLUDE_DIRS "include"
+       REQUIRES esp_littlefs
+   )
+   ```
+
+5. **Test in main.c:**
+   ```c
+   #include "prism_fs.h"
+
+   void app_main(void) {
+       ESP_ERROR_CHECK(prism_fs_init());
+       ESP_LOGI("main", "Filesystem ready at %s", STORAGE_MOUNT_PATH);
+   }
+   ```
+
+## Success Criteria
+- [x] LittleFS mounts at **/littlefs** (NOT /prism)
+- [x] All directory paths use /littlefs prefix
+- [x] Atomic write/rename works correctly
+- [x] Index operations succeed
+- [x] Pattern max size enforced: 256KB (ADR-004)
+- [x] Minimum 15 patterns supported (ADR-006)

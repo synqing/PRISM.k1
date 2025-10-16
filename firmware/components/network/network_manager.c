@@ -5,6 +5,7 @@
 
 #include "network_manager.h"
 #include "network_private.h"
+#include "protocol_parser.h"
 #include "prism_memory_pool.h"
 #include "prism_heap_monitor.h"
 #include "esp_log.h"
@@ -16,6 +17,9 @@
 #include "nvs.h"
 #include "mdns.h"
 #include "esp_http_server.h"
+#include "esp_http_client.h"
+#include <inttypes.h>
+#include "led_playback.h"
 #include <string.h>
 
 static const char *TAG = "network";
@@ -23,6 +27,160 @@ static const char *TAG = "network";
 /* Global network state */
 network_state_t g_net_state = {0};
 
+#ifdef CONFIG_PRISM_METRICS_HTTP
+// Metrics endpoint for soak tests
+static esp_err_t metrics_wave_handler(httpd_req_t *req) {
+    prism_wave_metrics_t m = {0};
+    esp_err_t err = playback_get_wave_metrics(&m);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "metrics unavailable");
+        return err;
+    }
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf),
+        "{\n  \"samples\": %" PRIu32 ",\n  \"cycles\": { \"min\": %" PRIu32 ", \"max\": %" PRIu32 ", \"avg\": %" PRIu32 " },\n  \"dcache\": { \"hits\": %llu, \"misses\": %llu, \"hit_rate\": %" PRIu32 " },\n  \"icache\": { \"hits\": %llu, \"misses\": %llu, \"hit_rate\": %" PRIu32 " },\n  \"insn\": { \"count\": %llu, \"ipc_x100\": %" PRIu32 " }\n}\n",
+        m.samples, m.min_cycles, m.max_cycles, m.avg_cycles,
+        (unsigned long long)m.dcache_hits, (unsigned long long)m.dcache_misses, m.dcache_hit_pct,
+        (unsigned long long)m.icache_hits, (unsigned long long)m.icache_misses, m.icache_hit_pct,
+        (unsigned long long)m.insn_count, m.ipc_x100);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, buf, len);
+    return ESP_OK;
+}
+
+#if CONFIG_PRISM_METRICS_PROMETHEUS
+static esp_err_t metrics_prom_handler(httpd_req_t *req)
+{
+    prism_wave_metrics_t m = {0};
+    if (playback_get_wave_metrics(&m) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "metrics unavailable");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "text/plain; version=0.0.4");
+    char line[160];
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_samples Number of samples in window\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_samples counter\n");
+    snprintf(line, sizeof(line), "prism_wave_samples %lu\n", (unsigned long)m.samples);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_cycles_min Minimum cycles in window\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_cycles_min gauge\n");
+    snprintf(line, sizeof(line), "prism_wave_cycles_min %lu\n", (unsigned long)m.min_cycles);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_cycles_max Maximum cycles in window\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_cycles_max gauge\n");
+    snprintf(line, sizeof(line), "prism_wave_cycles_max %lu\n", (unsigned long)m.max_cycles);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_cycles_avg Average cycles in window\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_cycles_avg gauge\n");
+    snprintf(line, sizeof(line), "prism_wave_cycles_avg %lu\n", (unsigned long)m.avg_cycles);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_dcache_hits Data cache hits\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_dcache_hits counter\n");
+    snprintf(line, sizeof(line), "prism_wave_dcache_hits %llu\n", (unsigned long long)m.dcache_hits);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_dcache_misses Data cache misses\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_dcache_misses counter\n");
+    snprintf(line, sizeof(line), "prism_wave_dcache_misses %llu\n", (unsigned long long)m.dcache_misses);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_dcache_hit_rate Data cache hit rate percent\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_dcache_hit_rate gauge\n");
+    snprintf(line, sizeof(line), "prism_wave_dcache_hit_rate %lu\n", (unsigned long)m.dcache_hit_pct);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_icache_hits Instruction cache hits\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_icache_hits counter\n");
+    snprintf(line, sizeof(line), "prism_wave_icache_hits %llu\n", (unsigned long long)m.icache_hits);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_icache_misses Instruction cache misses\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_icache_misses counter\n");
+    snprintf(line, sizeof(line), "prism_wave_icache_misses %llu\n", (unsigned long long)m.icache_misses);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_icache_hit_rate Instruction cache hit rate percent\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_icache_hit_rate gauge\n");
+    snprintf(line, sizeof(line), "prism_wave_icache_hit_rate %lu\n", (unsigned long)m.icache_hit_pct);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_insn_count Retired instruction count in window\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_insn_count counter\n");
+    snprintf(line, sizeof(line), "prism_wave_insn_count %llu\n", (unsigned long long)m.insn_count);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, "# HELP prism_wave_ipc_x100 IPC scaled by 100\n");
+    httpd_resp_sendstr_chunk(req, "# TYPE prism_wave_ipc_x100 gauge\n");
+    snprintf(line, sizeof(line), "prism_wave_ipc_x100 %lu\n", (unsigned long)m.ipc_x100);
+    httpd_resp_sendstr_chunk(req, line);
+
+    httpd_resp_sendstr_chunk(req, NULL); // end chunked response
+    return ESP_OK;
+}
+#endif
+
+#if CONFIG_PRISM_METRICS_CSV
+static esp_err_t metrics_csv_handler(httpd_req_t *req)
+{
+    prism_wave_metrics_t m = {0};
+    if (playback_get_wave_metrics(&m) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "metrics unavailable");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "text/csv");
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf),
+        "samples,min_cycles,max_cycles,avg_cycles,dc_hits,dc_miss,dc_hit_pct,ic_hits,ic_miss,ic_hit_pct,insn,ipc_x100\n"
+        "%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%llu,%llu,%" PRIu32 ",%llu,%llu,%" PRIu32 ",%llu,%" PRIu32 "\n",
+        m.samples, m.min_cycles, m.max_cycles, m.avg_cycles,
+        (unsigned long long)m.dcache_hits, (unsigned long long)m.dcache_misses, m.dcache_hit_pct,
+        (unsigned long long)m.icache_hits, (unsigned long long)m.icache_misses, m.icache_hit_pct,
+        (unsigned long long)m.insn_count, m.ipc_x100);
+    httpd_resp_send(req, buf, len);
+    return ESP_OK;
+}
+#endif
+#endif // CONFIG_PRISM_METRICS_HTTP
+
+#if CONFIG_PRISM_METRICS_PUSH
+static void metrics_push_task(void *arg)
+{
+    const TickType_t delay = pdMS_TO_TICKS(CONFIG_PRISM_METRICS_PUSH_INTERVAL_SEC * 1000);
+    while (1) {
+        prism_wave_metrics_t m = {0};
+        if (playback_get_wave_metrics(&m) == ESP_OK && CONFIG_PRISM_METRICS_PUSH_URL[0] != '\0') {
+            char body[512];
+            int len = snprintf(body, sizeof(body),
+                "{\"samples\":%" PRIu32 ",\"cycles\":{\"min\":%" PRIu32 ",\"max\":%" PRIu32 ",\"avg\":%" PRIu32 "},\"dcache\":{\"hits\":%llu,\"misses\":%llu,\"hit_rate\":%" PRIu32 "},\"icache\":{\"hits\":%llu,\"misses\":%llu,\"hit_rate\":%" PRIu32 "},\"insn\":{\"count\":%llu,\"ipc_x100\":%" PRIu32 "}}",
+                m.samples, m.min_cycles, m.max_cycles, m.avg_cycles,
+                (unsigned long long)m.dcache_hits, (unsigned long long)m.dcache_misses, m.dcache_hit_pct,
+                (unsigned long long)m.icache_hits, (unsigned long long)m.icache_misses, m.icache_hit_pct,
+                (unsigned long long)m.insn_count, m.ipc_x100);
+
+            esp_http_client_config_t cfg = {
+                .url = CONFIG_PRISM_METRICS_PUSH_URL,
+                .method = HTTP_METHOD_POST,
+                .timeout_ms = 2000,
+            };
+            esp_http_client_handle_t client = esp_http_client_init(&cfg);
+            if (client) {
+                esp_http_client_set_header(client, "Content-Type", "application/json");
+                esp_http_client_set_post_field(client, body, len);
+                esp_err_t err = esp_http_client_perform(client);
+                if (err != ESP_OK) {
+                    ESP_LOGW(TAG, "metrics push failed: %s", esp_err_to_name(err));
+                }
+                esp_http_client_cleanup(client);
+            }
+        }
+        vTaskDelay(delay);
+    }
+}
+#endif
 /**
  * @brief Initialize WiFi dual-mode (AP + STA)
  */
@@ -566,6 +724,36 @@ esp_err_t start_captive_portal(void) {
     };
     httpd_register_uri_handler(g_net_state.http_server, &uri_wildcard);
 
+#ifdef CONFIG_PRISM_METRICS_HTTP
+    httpd_uri_t uri_metrics = {
+        .uri = "/metrics/wave",
+        .method = HTTP_GET,
+        .handler = metrics_wave_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(g_net_state.http_server, &uri_metrics);
+
+#if CONFIG_PRISM_METRICS_PROMETHEUS
+    httpd_uri_t uri_prom = {
+        .uri = "/metrics",
+        .method = HTTP_GET,
+        .handler = metrics_prom_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(g_net_state.http_server, &uri_prom);
+#endif
+
+#if CONFIG_PRISM_METRICS_CSV
+    httpd_uri_t uri_csv = {
+        .uri = "/metrics.csv",
+        .method = HTTP_GET,
+        .handler = metrics_csv_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(g_net_state.http_server, &uri_csv);
+#endif
+#endif
+
     g_net_state.portal_active = true;
     ESP_LOGI(TAG, "Captive portal started on port %d", CAPTIVE_PORTAL_PORT);
 
@@ -575,6 +763,11 @@ esp_err_t start_captive_portal(void) {
         ESP_LOGW(TAG, "Failed to init WebSocket handler: %s", esp_err_to_name(ret));
         // Non-fatal, portal still works
     }
+
+#if CONFIG_PRISM_METRICS_PUSH
+    // Start background push task
+    xTaskCreate(metrics_push_task, "metrics_push", 4096, NULL, 3, NULL);
+#endif
 
     return ESP_OK;
 }
@@ -1236,11 +1429,14 @@ esp_err_t handle_ws_frame(httpd_req_t *req, int client_idx) {
     ESP_LOGI(TAG, "Received %zu bytes from client %d", ws_pkt.len, client_idx);
     ESP_LOG_BUFFER_HEX_LEVEL(TAG, ws_pkt.payload, ws_pkt.len > 64 ? 64 : ws_pkt.len, ESP_LOG_DEBUG);
 
-    // TODO: Task 4 - Pass to TLV parser
-    // return tlv_dispatch_command(ws_pkt.payload, ws_pkt.len, req);
-
-    // Placeholder: Echo received data back for testing
-    send_ws_status(req, 0x00, "Frame received");  // Status: OK
+    // Task 4: Dispatch raw WebSocket binary frame to protocol parser
+    // The parser handles: TLV parsing, CRC validation, command dispatch, error responses
+    int sockfd = httpd_req_to_sockfd(req);
+    ret = protocol_dispatch_command(ws_pkt.payload, ws_pkt.len, sockfd);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Protocol dispatch failed: %s", esp_err_to_name(ret));
+        return ESP_FAIL;
+    }
 
     return ESP_OK;
 }

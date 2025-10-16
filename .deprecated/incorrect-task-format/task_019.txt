@@ -1,0 +1,44 @@
+# Task ID: 019
+# Title: Implement timeline player
+# Status: pending
+# Dependencies: 018
+# Priority: high
+# CANON ADRs: ADR-003
+# CANON Validated: 2025-10-15
+
+## Description
+Create timeline-based pattern playback system for 320-LED output.
+
+## CANON Specifications
+```yaml
+# ADR-003: LED Output
+led_count: 320
+led_fps: 60
+timebase: esp_timer_get_time()
+interpolation: keyframe-based
+looping: seamless
+```
+
+## Details
+Track current position in milliseconds using esp_timer_get_time(). Interpolate between keyframes. Support looping with seamless wraparound. Calculate frame data for **320 LEDs** (ADR-003).
+
+## Test Strategy
+1. Play 10-second pattern, verify position tracking
+2. Test loop wraparound seamless
+3. Verify 320-LED output correct
+4. Test keyframe interpolation
+5. Benchmark frame generation time
+
+## Agent Guidance
+1. Define timeline model (ms-based keyframes)
+2. Implement position tracking via esp_timer
+3. Keyframe lookup and interpolation
+4. Generate 320-LED frame data
+5. Handle loop boundaries
+6. Test 10s pattern with loop
+
+## Success Criteria
+- [x] Timeline playback accurate
+- [x] Looping seamless
+- [x] 320-LED output (ADR-003)
+- [x] Interpolation smooth

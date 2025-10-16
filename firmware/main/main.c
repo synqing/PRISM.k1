@@ -160,9 +160,9 @@ void app_main(void)
 
     /* Initialize components (Task 1: Component Scaffolding) */
     ESP_LOGI(TAG, "Initializing firmware components...");
-    ESP_ERROR_CHECK(network_init());    /* WiFi & WebSocket (stub) */
-    ESP_ERROR_CHECK(storage_init());    /* LittleFS (stub) */
-    ESP_ERROR_CHECK(playback_init());   /* RMT LED Driver (stub) */
+    ESP_ERROR_CHECK(network_init());    /* WiFi & WebSocket (Task 2 complete) */
+    ESP_ERROR_CHECK(storage_init());    /* LittleFS (Task 5 subtasks 5.1-5.4 complete) */
+    ESP_ERROR_CHECK(playback_init());   /* RMT LED Driver (Task 8 complete) */
     ESP_ERROR_CHECK(templates_init());  /* Template catalog (stub) */
     ESP_LOGI(TAG, "All components initialized");
 

@@ -1,0 +1,413 @@
+{
+	"meta": {
+		"generatedAt": "2025-10-15T02:29:49.597Z",
+		"tasksAnalyzed": 50,
+		"totalTasks": 53,
+		"analysisCount": 50,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 4,
+			"taskTitle": "Implement core filesystem operations (prism_fs)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Implement storage init and atomic ops in C under firmware/components/storage:\n- Add storage/include/prism_fs.h API: prism_fs_init(), prism_fs_atomic_write(path,tmp,data,len), prism_fs_delete(), prism_index_{load,save,upsert,remove}.\n- Implement prism_fs_init() using esp_vfs_littlefs_register() with format_if_mount_failed=true; ensure /prism and subdirs exist.\n- Implement atomic commit pattern: write to path.tmp, fsync, close, rename to final.\n- Implement index management at /prism/.index.json using cJSON; load on boot, persist on updates.\n- Add error propagation using core error codes and logging.\n- Add Unity tests for mount/unmount, create/rename/delete, atomic rename.",
+			"reasoning": "Storage component exists only as CMake scaffolding with no sources; implementing mount, atomic writes, and JSON index from scratch on ESP-IDF + LittleFS is moderately complex and cross-cuts error handling and tests."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Implement hash functions (prism_hash)",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Create core hashing utilities in firmware/components/core (or a new 'hash' submodule):\n- Add include/prism_hash.h with CRC32 and SHA256 APIs (single-shot and streaming).\n- Implement CRC32 via esp_rom_crc32_le(); implement SHA256 via mbedtls_sha256_context init/update/finish.\n- Add hex encoding utility for 32/64-byte digests.\n- Add Unity tests using NIST vectors; verify streaming vs single-shot equality.",
+			"reasoning": "ESP-IDF provides ROM CRC32 and mbedTLS; wiring thin wrappers and tests is straightforward, with minor care for streaming and hex conversions."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Create error code system (prism_errors)",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Introduce centralized errors in firmware/components/core:\n- Define include/prism_errors.h enum (PRISM_OK, PRISM_ERR_*, etc.) and helper macros using ESP_ERROR_CHECK_WITHOUT_ABORT.\n- Implement error_to_http_status() in core/error_handler.c mapping to HTTP status codes.\n- Update modules to return prism_error_t and convert at boundaries.",
+			"reasoning": "Mostly header + small mapping function and macro usage; low implementation effort with broad but mechanical integration."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Implement binary file format parser for .prism files",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Create robust .prism parser under storage:\n- Define include/prism_format.h (header struct, TLV constants 0x0001–0x0005, bounds and size limits).\n- Implement storage/pattern_format.c: header validation (magic 'PRISM\\x00\\x00\\x00', version), CRC32 over header, length checks.\n- Implement safe TLV iterator with max lengths, overflow checks, and allocation limits.\n- Parse required TLVs into a PatternMeta struct (uuid, duration, palette refs, etc.).\n- Integrate CRC32 from prism_hash and error codes.\n- Add fuzz-ish unit tests for malformed headers, oversized TLVs, corrupted CRC.\n- Document on-disk constraints for future writers.",
+			"reasoning": "Greenfield binary format work with strict safety/bounds, CRC, and TLV parsing requires careful implementation and thorough negative tests."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Implement structural efficiency optimizations",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Add structure-first size reductions spanning parser and compiler-side assumptions:\n- Define shared palette table model in PatternMeta and resolve palette deduplication by ID/reference.\n- Implement delta encoding for keyframes in pattern_format.c with helper to reconstruct absolute frames.\n- Add RAM hot cache (LRU of N decoded patterns) in storage/cache_manager.c.\n- Extend .prism TLV schema to carry palette refs and delta-coded frames; guard with versioning.\n- Add tests verifying round-trip decode correctness and size improvements on synthetic patterns.\n- Provide metrics hooks to report hit rate and average compressed sizes.",
+			"reasoning": "Requires format/schema extensions, decode/encode logic, cache design, and validation; substantial algorithmic and structural work across modules."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Generate self-signed certificate for HTTPS",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Embed PEM certificate+key and loading hooks:\n- Generate 2048-bit RSA cert via openssl; convert to C string arrays (server_cert_pem, server_key_pem) under network/include/certs.h.\n- Add secure storage of PEM in flash (const char* literals) and compile-time size checks.\n- Add quick loader function to fill httpd_ssl_config_t fields.",
+			"reasoning": "ESP-IDF HTTPS server accepts in-memory PEM; task is mainly key generation and embedding with minimal glue code."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Initialize HTTPS server (prism_http)",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Stand up HTTPS server in network:\n- Add network/https_server.c with start/stop functions using esp_https_server and HTTPD_SSL_CONFIG_DEFAULT().\n- Set server_cert and server_key from embedded PEM, tune max_uri_handlers=20, max_open_sockets=7, stack_size=8192.\n- Bind to port 443, verify start/stop lifecycle and logging.\n- Export router registration API to add endpoints.\n- Add basic health endpoint for smoke tests.",
+			"reasoning": "Server bootstrap is standard in ESP-IDF but requires correct SSL config and resource tuning; no existing HTTP code in repo yet."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Implement REST endpoint routing",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Add HTTP routing and handlers in network:\n- Create network/http_routes.c to register endpoints on https_server instance.\n- Implement POST /api/patterns (stub), GET /api/patterns, DELETE /api/patterns/:id, POST /api/play, POST /api/playlist, GET /api/status skeletons.\n- Add URI parsing helpers for path params and JSON body parsing (cJSON).\n- Wire to storage and playback modules via clear interfaces.\n- Add minimal integration tests with curl -k (manual script).",
+			"reasoning": "Requires router scaffolding, consistent handler patterns, and cross-module wiring with cJSON; moderate complexity with several moving parts."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Implement streaming upload handler",
+			"complexityScore": 8,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Robust chunked upload with SHA256 and atomic commit:\n- Implement network/upload_handler.c: read via httpd_req_recv() in 4KB chunks, write to /prism/.upload/<uuid>.tmp.\n- Stream SHA256 using prism_hash; compare with X-PRISM-SHA256 on completion.\n- Use prism_fs atomic rename to final path; cleanup on error.\n- Enforce file size and path constraints; handle client aborts/timeouts.\n- Optional: WebSocket progress via broadcast if prism_ws is active.\n- Update index.json on success.\n- Add throttled logging and return appropriate HTTP status codes.\n- Add tests: 50KB upload, interrupted upload cleanup, hash mismatch.",
+			"reasoning": "Combines HTTP streaming, hashing, atomic FS semantics, and concurrency/error handling; no prior HTTP/upload code exists, increasing complexity."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Implement pattern list endpoint",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Read index and emit JSON:\n- Implement GET /api/patterns in http_routes.c.\n- Load /prism/.index.json via prism_fs; if missing, return [].\n- Build array with uuid, name, size, uploadTime, duration; set Content-Type: application/json.\n- Add unit tests against empty and populated indices.",
+			"reasoning": "Straightforward endpoint once prism_fs index is in place; moderate due to parsing/serialization and error handling."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Implement pattern delete endpoint",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Safe delete with index update:\n- Parse UUID from URI; validate format.\n- Delete pattern file via prism_fs_delete(); update index.json to remove entry; return 200 or 404 accordingly.\n- Add tests to verify file removal and index update, including missing file case.",
+			"reasoning": "Simple FS + index update flow leveraging prism_fs utilities; limited scope."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "Add WebSocket endpoint (prism_ws)",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Set up WebSocket handler in network:\n- Implement websocket_handler.c to register /ws and perform handshake using httpd_ws_respond_server_handshake().\n- Implement frame receive loop with httpd_ws_recv_frame(), supporting text and binary.\n- Maintain client list (fd set) with add/remove on connect/disconnect.\n- Provide send helper for text/binary.\n- Add minimal echo/test command.\n- Validate with wscat and logs.",
+			"reasoning": "ESP-IDF WS API is available but requires careful framing and connection lifecycle management; no existing network code to reuse."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "Implement WebSocket message parser",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "JSON message router using cJSON:\n- In protocol_parser.c, define message schema and validate root fields.\n- Route by 'type': set_param, play, pause, stop, get_status, subscribe.\n- Return structured errors for invalid/malformed messages.\n- Expose callbacks into playback/storage subsystems.\n- Tests for valid/invalid messages and routing coverage.",
+			"reasoning": "Medium complexity for robust JSON validation and routing; clear interfaces reduce coupling."
+		},
+		{
+			"taskId": 17,
+			"taskTitle": "Implement WebSocket client management",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Connection tracking and broadcast:\n- Implement fixed-size client table (max 5) with fd entries and state.\n- Add on-connect/on-disconnect hooks and cleanup paths.\n- Implement broadcast using httpd_ws_send_frame_async() with backpressure handling.\n- Tests with multiple clients receiving a broadcast.",
+			"reasoning": "State management and async send require care but are bounded; complexity moderate."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Create execution engine task (prism_exec)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "FreeRTOS-based execution engine under playback:\n- Define playback/include/prism_exec.h and shared command types (play/pause/stop).\n- Create task with 8KB stack, priority tskIDLE_PRIORITY+5; queue depth 16.\n- Main loop: drain commands, update timeline clock, generate frame, output LEDs at 60 FPS.\n- Integrate esp_timer for timebase and led_driver for output.\n- Expose API to enqueue commands from HTTP/WS.\n- Add watchdog yield and performance logging.\n- Unit tests for queue behavior and frame cadence (where feasible).",
+			"reasoning": "New real-time task with strict cadence and concurrency with network; LED driver not yet implemented increases risk."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Implement timeline player",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Timestamped keyframe playback:\n- Define timeline model and keyframe structs (ms-based) in playback/include/timeline.h.\n- Implement timeline_player.c: position tracking via esp_timer_get_time(), loop handling, keyframe lookup.\n- Interpolate between keyframes (hooks to interpolation module).\n- Produce per-frame parameters for effect engine / renderer.\n- Tests: 10s pattern playback, loop wraparound correctness.\n- Logging/metrics for drift and frame drops.",
+			"reasoning": "Core animation logic with interpolation, loop handling, and timebase accuracy; depends on execution engine integration."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Implement curve interpolation",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Fixed-point interpolation helpers:\n- Implement playback/interpolation.c with linear, ease-in, ease-out, ease-in-out curves.\n- Add cubic Bezier with precomputed LUT where beneficial; use fixed-point math.\n- Cache curve parameters; expose API interpolate(curve, t, a, b).\n- Tests validating smoothness and accuracy across curves.\n- Micro-benchmarks for performance.",
+			"reasoning": "Mathematical correctness and fixed-point performance tuning raise complexity above basic utilities."
+		},
+		{
+			"taskId": 21,
+			"taskTitle": "Implement palette manager",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Color utilities and TLV-driven palettes:\n- Define playback/palette_manager.c and include/palette.h for up to 256 colors.\n- Load palette from .prism TLV via pattern_format.c; support shared palette references.\n- Implement HSV→RGB, blending/mixing functions.\n- Expose indexed color lookups for renderer.\n- Tests for conversions and blending accuracy.",
+			"reasoning": "Self-contained color math and data loading; moderate complexity, with a small interface to storage/format."
+		},
+		{
+			"taskId": 22,
+			"taskTitle": "Implement live parameter system",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Thread-safe live parameters:\n- Define shared struct (intensity, speed, hue_shift, saturation) with mutex in playback/include/live_params.h.\n- Update during render; apply modulation in frame generation.\n- Add queue message to update engine on change; throttle updates if needed.\n- Wire WS set_param route to this API.\n- Unit tests for thread-safety and immediate effect.",
+			"reasoning": "Concurrency and real-time constraints require care but scope is contained; interfaces to WS and playback are clear."
+		},
+		{
+			"taskId": 23,
+			"taskTitle": "Implement playlist manager (prism_playlist)",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Basic sequential/shuffle playback:\n- Implement playback/playlist_manager.c with array of UUIDs and current index.\n- Support next/previous, shuffle, repeat modes; auto-advance on completion.\n- Expose API for HTTP/WS to set playlist and control playback.\n- Tests for transitions and mode behaviors.",
+			"reasoning": "State machine is straightforward; integration with execution engine and status updates adds minor complexity."
+		},
+		{
+			"taskId": 24,
+			"taskTitle": "Implement play command endpoint",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Play control over HTTP:\n- In http_routes.c, implement POST /api/play parsing JSON {uuid, start_ms, loop}.\n- Validate UUID, look up pattern, enqueue play command to prism_exec.\n- Return immediate response and update playback status.\n- Integration tests via curl for various start positions.",
+			"reasoning": "Bridges network and playback safely; moderate JSON validation and queuing logic."
+		},
+		{
+			"taskId": 25,
+			"taskTitle": "Implement status endpoint",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Comprehensive GET /api/status:\n- Collect playback state, current pattern, position, loop, live params from playback.\n- Query storage usage via esp_littlefs_info(); compute percent used.\n- Include system uptime from esp_timer.\n- Serialize with cJSON; handle errors gracefully.\n- Tests validating fields during playback and idle.",
+			"reasoning": "Requires aggregating data across subsystems and stable JSON contract; moderate complexity."
+		},
+		{
+			"taskId": 26,
+			"taskTitle": "Add mDNS service discovery",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Zero-conf setup in network_manager.c:\n- Initialize mdns, set hostname 'prism-k1'.\n- Advertise _https._tcp on 443 with TXT (version, capabilities).\n- Smoke test with mdns browser; ensure teardown on stop.",
+			"reasoning": "Small integration with existing ESP-IDF mDNS APIs; low complexity."
+		},
+		{
+			"taskId": 27,
+			"taskTitle": "Implement rate limiting",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Request-per-IP throttling for uploads:\n- Implement network/rate_limit.c with simple hash map (IP→counter,timestamp).\n- Intercept POST /api/patterns; limit to 10/min; return 429 if exceeded.\n- Periodic timer to reset counters; handle IP extraction from httpd req.\n- Configurable limits; logging when throttled.\n- Tests simulating 11 rapid uploads and reset behavior.",
+			"reasoning": "Moderate: state tracking per client, timer housekeeping, and HTTP integration without global contention."
+		},
+		{
+			"taskId": 28,
+			"taskTitle": "Implement concurrent upload limit",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Semaphore-guarded concurrency:\n- Add global counting semaphore (max 2) acquired at upload start, released on completion/error.\n- Return 503 when limit reached; ensure all error paths release semaphore.\n- Tests starting 3 concurrent uploads verifying 3rd is rejected and resources are released.",
+			"reasoning": "Simple concurrency primitive around upload handler with careful error-path handling; low complexity."
+		},
+		{
+			"taskId": 29,
+			"taskTitle": "Add filesystem reconciliation",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Index rebuild on boot:\n- On storage init, scan /prism for *.prism files.\n- Validate headers via pattern_format.c and extract metadata to rebuild index.json.\n- Remove orphaned temp files under /prism/.upload.\n- Log discrepancies and summarize repair actions.\n- Tests: simulate corrupt/missing index and orphaned files; verify rebuild correctness.\n- Optional: progress callback for long scans.",
+			"reasoning": "Combines directory traversal, robust format validation, and index regeneration; important recovery paths increase complexity."
+		},
+		{
+			"taskId": 30,
+			"taskTitle": "Implement power-loss recovery",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Journaling and two-phase commit:\n- Implement storage/journal.c for critical ops with begin/commit markers written atomically.\n- Two-phase upload commit: write to temp, write journal entry, fsync, rename, clear journal.\n- Persist recovery markers in NVS for last op state and versioning.\n- On boot, read journal/NVS and clean incomplete operations; reconcile with index.\n- Integrate with upload handler and index updates.\n- Unit tests simulating power loss at multiple phases.\n- Detailed logging and metrics for recovery events.",
+			"reasoning": "Requires robust crash-consistent protocol across FS and NVS with recovery logic; significant cross-cutting complexity."
+		},
+		{
+			"taskId": 31,
+			"taskTitle": "Create unit tests for core modules",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Unity-based test suite for firmware:\n- Add tests for prism_hash (CRC32/SHA256 with NIST vectors).\n- Add tests for TLV parser with malformed data and bounds checks.\n- Add tests for filesystem atomic operations and index.\n- Wire Unity into ESP-IDF build and CI target.\n- Provide test fixtures and mocks for file I/O and time where possible.\n- Achieve >80% coverage on core modules.",
+			"reasoning": "Setting up test harness and meaningful coverage for binary/FS code takes effort, but ESP-IDF and Unity ease integration."
+		},
+		{
+			"taskId": 32,
+			"taskTitle": "Create integration tests",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "End-to-end scripts and flows:\n- Shell scripts using curl -k for HTTPS API and wscat for WebSocket commands.\n- Test upload/verify/commit flow and playback start.\n- Negative cases (bad hash, interrupted upload).\n- Document how to run on hardware with configurable IP.\n- Include basic report output and exit codes for CI gating.",
+			"reasoning": "Scripted E2E flows are straightforward but require sequencing, environment setup, and device orchestration."
+		},
+		{
+			"taskId": 33,
+			"taskTitle": "Implement memory profiling",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Heap monitoring and leak detection:\n- Extend core/memory_manager.c to sample esp_get_free_heap_size() and minimums around critical ops.\n- Add heap_caps_check_integrity_all() checks in debug builds.\n- Threshold-based warnings and optional stats dump on low memory.\n- Stress test script to validate stability over time.",
+			"reasoning": "Main.c already logs heap; consolidating and adding integrity checks is incremental with limited complexity."
+		},
+		{
+			"taskId": 34,
+			"taskTitle": "Performance optimization",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Targeted profiling and hot-path tuning:\n- Add lightweight profiling via esp_timer around frame generation, network upload, and FS ops.\n- Optimize effect engine and memory allocations (pooling/caching); reduce mallocs in hot paths.\n- Consider DMA for LED output and precomputed LUTs for curves.\n- Tune WS/HTTP buffers and socket limits for throughput.\n- Benchmark to hit 60 FPS, <100ms latency, >500KB/s uploads.\n- Document results and regressions tests.",
+			"reasoning": "Cross-cutting optimization over rendering, I/O, and networking with measurable targets; iterative and non-trivial."
+		},
+		{
+			"taskId": 35,
+			"taskTitle": "Create comprehensive documentation",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Author and validate docs in /docs or specs/:\n- REST API with examples; WebSocket protocol spec.\n- Integration guide for clients and troubleshooting.\n- Configuration and build/flash guides.\n- Validate all examples against running firmware.\n- Establish doc versioning and update policy.",
+			"reasoning": "Broad documentation effort spanning multiple subsystems; verification takes time but is straightforward."
+		},
+		{
+			"taskId": 36,
+			"taskTitle": "Create walking skeleton WebSocket MVP",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Minimal E2E path in a single file first, then refactor:\n- Implement /ws WebSocket in main (or network) handling PUT_BEGIN/PUT_DATA/PUT_END and PLAY messages.\n- Write upload chunks to LittleFS temp, atomic rename on completion.\n- Simple in-memory registry of uploaded files; stub playback OK response.\n- Log-only playback (no LED output yet).\n- Verify with wscat 10KB transfer and PLAY command.\n- Refactor into network/storage modules afterward.",
+			"reasoning": "Scoped MVP without full validation, but touches WS, FS, and control flow; manageable with careful staging."
+		},
+		{
+			"taskId": 37,
+			"taskTitle": "Implement dual upload protocol support",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Unify HTTP and WS upload backends:\n- Keep POST /api/patterns and add WS upload route; share prism_fs and hashing logic.\n- Abstract common writer (tmp path, fsync, rename) behind upload service.\n- Tests verifying identical storage results and index updates for both protocols.\n- Rate limiting and concurrency limits apply equally.\n- Documentation of both flows for clients.",
+			"reasoning": "Requires factoring shared code and ensuring identical commit semantics across protocols; moderate complexity."
+		},
+		{
+			"taskId": 38,
+			"taskTitle": "Create Tauri 2 desktop app scaffold",
+			"complexityScore": 7,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Initialize desktop app monorepo app:\n- Bootstrap Tauri 2 with Rust backend and React frontend skeleton.\n- Add deps: tokio-tungstenite (WS client), mdns-sd, serde, React tooling.\n- Wire device discovery service and simple connect UI.\n- Basic upload UI to send file over WS.\n- Dev scripts for macOS/Windows/Linux.\n- CI build config.\n- Documentation for local run.",
+			"reasoning": "Greenfield desktop app with cross-platform setup, Rust/React integration, and networking; heavier scaffolding effort."
+		},
+		{
+			"taskId": 39,
+			"taskTitle": "Implement Three.js LED preview",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "3D LED visualization:\n- Create K1Preview class using Three.js with InstancedMesh for ~320 LEDs.\n- Add light guide plate mesh with MeshPhysicalMaterial; UnrealBloomPass for glow.\n- Expose updateLEDs(rgb[]) API for real-time updates.\n- Integrate with Tauri frontend state loop at 60 FPS.\n- Performance profiling on typical hardware.",
+			"reasoning": "Custom 3D scene with performance constraints; moderate complexity with known patterns in Three.js."
+		},
+		{
+			"taskId": 40,
+			"taskTitle": "Create .prism format compiler",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Rust-based writer for .prism v1:\n- Define header and TLV schema matching device (magic/version/duration/CRC32).\n- Implement writer with structural optimizations: shared palettes, delta-encoded keyframes.\n- Implement CRC32 consistent with device ROM function (little-endian).\n- Provide CLI to compile example timeline → .prism.\n- Round-trip tests with device parser; size comparisons against naive output.\n- Library crate for reuse by app; docs and examples.",
+			"reasoning": "Greenfield Rust tooling and alignment with embedded parser, plus structural optimizations and CRC compatibility elevate complexity."
+		},
+		{
+			"taskId": 41,
+			"taskTitle": "Implement timeline editor UI (primary creation mode)",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Minimum viable timeline editor in React:\n- Single-track timeline with drag/drop clips, snap-to-grid, zoom.\n- Clip CRUD, basic undo/redo, and keyboard shortcuts.\n- Data model that compiles to .prism via Rust compiler.\n- Preview integration with K1Preview and device playback.\n- Persistence and template import baseline.\n- Accessibility and responsive layout basics.\n- Tests for key interactions; performance tuning.",
+			"reasoning": "Substantial UI/UX + data model + compiler integration; primary creation workflow with high surface area."
+		},
+		{
+			"taskId": 42,
+			"taskTitle": "Add device discovery UI",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "mDNS-driven device picker:\n- Backend: mdns-sd scan for _k1prism._tcp and cache results; manual IP fallback.\n- Frontend: device list with connect/retry, status, last-connected persistence.\n- Error handling and timeouts with clear UX.\n- Tests for discovery and fallback flows.",
+			"reasoning": "Moderate: tie mdns backend to React UI with robust handling; standard patterns."
+		},
+		{
+			"taskId": 43,
+			"taskTitle": "Create monorepo structure",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Organize into apps/, firmware/, libs/, specs/:\n- Move current firmware under firmware/; create apps/studio (Tauri), libs/pattern (Rust), specs/ docs.\n- Shared tooling (prettier, eslint, cargo workspaces), cross-build scripts.\n- Update CI and build docs.\n- Ensure each package builds independently.",
+			"reasoning": "Repository reorganization and tooling; medium effort to wire builds and CI without breaking firmware."
+		},
+		{
+			"taskId": 44,
+			"taskTitle": "Implement pattern storage UI",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Device pattern management in UI:\n- Call GET /api/patterns to list items with sizes; show storage usage bar.\n- Delete action mapped to DELETE /api/patterns/:id with confirmation.\n- Optional reordering to drive playlist (if supported).\n- Loading/empty/error states; pagination if needed.\n- Tests with mock server and live device.",
+			"reasoning": "Typical CRUD-like UI bound to device endpoints; moderate complexity with state management."
+		},
+		{
+			"taskId": 45,
+			"taskTitle": "Add real-time parameter control",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Live controls connected via WS:\n- UI sliders/inputs for brightness, speed, hue shift.\n- Send SET_PARAM messages (text/binary) to device; throttle/debounce.\n- Update local preview simultaneously.\n- Tests for immediate visual feedback and device sync.",
+			"reasoning": "Small UI + WS messaging and preview updates; low to moderate complexity."
+		},
+		{
+			"taskId": 46,
+			"taskTitle": "Design template system architecture",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Specification and data model:\n- Define template metadata schema (name, desc, duration, category, thumbnail, params).\n- Decide storage: embedded vs remote CDN with manifest; versioning and caching.\n- Map template → timeline editor loading and parameterization.\n- Author design doc and validate with stakeholders.",
+			"reasoning": "Primarily design/documentation with some data modeling; limited coding effort."
+		},
+		{
+			"taskId": 47,
+			"taskTitle": "Implement template library UI",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Gallery with preview and deploy:\n- Grid/list view with categories, search, favorites.\n- Preview via K1Preview; detail sheet with parameters.\n- Deploy compiles template → .prism and uploads to device.\n- Offline/online assets; progress and error handling.\n- Tests spanning browse, preview, deploy flows.",
+			"reasoning": "Full-featured UI spanning browsing, preview, and compilation/upload integration; sizeable front-end work."
+		},
+		{
+			"taskId": 48,
+			"taskTitle": "Create 5 foundational templates (Phase 1)",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Author initial template set:\n- Define 5 base templates (Ambient Pulse, Energy Wave, Minimal Fade, Strobe Burst, Color Cycle).\n- Provide thumbnails and metadata; parameter presets.\n- Validate playback on device and preview quality.\n- Ensure compiler outputs valid .prism files.\n- Document creative intent and usage.",
+			"reasoning": "Content creation with technical validation and visual QA; moderate effort."
+		},
+		{
+			"taskId": 49,
+			"taskTitle": "Create 10 diverse templates (Phase 2)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Expand catalog diversity:\n- Author 10 templates across rhythmic, ambient, high-energy, experimental, holiday.\n- Ensure variety in speed/palette/complexity and parameter coverage.\n- Batch compile and test on device; curate for quality.\n- Update gallery metadata and categories.\n- User testing checklist for 60s success criterion.",
+			"reasoning": "Larger content production run with QA and categorization; higher effort than Phase 1."
+		},
+		{
+			"taskId": 50,
+			"taskTitle": "Add 5 advanced templates (Phase 3)",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Showcase advanced techniques:\n- Create 5 advanced templates (multi-layer, complex palettes, beat-reactive, generative, showcase).\n- Verify device performance and frame timing.\n- Provide educational notes for users exploring the editor.\n- Final proofing and tagging for discoverability.\n- Performance/regression tests on device.",
+			"reasoning": "Complex creative work requiring performance validation; moderate-high but focused scope."
+		},
+		{
+			"taskId": 51,
+			"taskTitle": "Implement template-to-timeline conversion",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Editable template flow:\n- Add 'Edit Template' button to load template into timeline editor with preserved metadata.\n- Enable modifications (clips, timing, palettes) and 'Save as' to custom pattern.\n- Optional: 'Save as Template' for sharing; schema compatibility checks.\n- Upload compiled result and verify on device.\n- Tests for seamless round-trip editing.",
+			"reasoning": "Bridges gallery and editor with data conversion and UX; moderate complexity."
+		},
+		{
+			"taskId": 52,
+			"taskTitle": "Add template update mechanism",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Remote manifest + caching:\n- Define remote JSON manifest format with versioning and signatures (if needed).\n- Fetch on launch with caching and offline fallback to embedded templates.\n- Diff and notify user of updates; lazy-load assets.\n- Handle errors and retries robustly.\n- Tests for update, offline mode, and rollback.\n- Document CDN process and security considerations.",
+			"reasoning": "Networking, caching, and update UX with resilience requirements; moderate complexity."
+		},
+		{
+			"taskId": 53,
+			"taskTitle": "Add node editor as experimental feature",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Prototype advanced node-based editor:\n- Minimal node graph UI (effect, palette, parameter, composition nodes) behind 'Advanced Mode'.\n- Graph → intermediate representation and compile to .prism via Rust backend.\n- Live preview wiring and performance constraints.\n- Persistence and import/export.\n- Guardrails in UI (limits) and progressive disclosure.\n- User testing for feasibility.\n- Document as experimental, not required for 1.0.",
+			"reasoning": "Significant UI + dataflow compiler design and performance; scoped as experimental but technically demanding."
+		}
+	]
+}

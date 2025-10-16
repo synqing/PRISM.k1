@@ -116,3 +116,20 @@ See [storage_layout.md](../docs/storage_layout.md)
 ## Templates
 
 See [template_catalog.md](../docs/template_catalog.md)
+
+## Profiling & Metrics (Developers)
+
+Temporal profiling can be enabled for WAVE mode to validate cycle budget and cache behavior.
+
+- Enable: `idf.py menuconfig → Components → PRISM Playback → Enable temporal profiling`
+- Counters: toggle D$/I$ hit/miss and instruction count under the same menu
+- Console logs: once per second (min/max/avg cycles, D$/I$, IPC when enabled)
+- Accessors: `playback_get_wave_metrics()` returns a structured snapshot
+- CLI: run `prism_metrics` to print a snapshot (enable in Kconfig)
+- HTTP endpoints (when enabled):
+  - `/metrics/wave` (JSON)
+  - `/metrics` (Prometheus exposition)
+  - `/metrics.csv` (CSV)
+- Optional push: periodically POST JSON snapshots to a configured URL
+
+See docs/phase3/wave_performance.md for full details.

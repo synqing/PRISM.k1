@@ -13,6 +13,7 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "prism_config.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -24,10 +25,11 @@ extern "C" {
 #define STORAGE_MOUNT_PATH  "/littlefs"
 #define STORAGE_PARTITION   "littlefs"
 
-// ADR-006: Pattern storage bounds (simplified for recovery)
-#define PATTERN_SIZE_MAX    102400      // 100KB per pattern (simplified)
-#define PATTERN_MIN_COUNT   15          // Must fit 15 patterns minimum
-#define PATTERN_IDEAL_COUNT 25          // Target capacity
+// ADR-004/ADR-006: Pattern storage bounds
+// Use canonical maximum size from CANON (256KB), minimum count from ADR-006
+#define PATTERN_SIZE_MAX    PATTERN_MAX_SIZE   // 256KB per pattern (SoT)
+#define PATTERN_MIN_COUNT   15                 // Must fit 15 patterns minimum
+#define PATTERN_IDEAL_COUNT 25                 // Target capacity
 
 /**
  * @brief Initialize storage subsystem

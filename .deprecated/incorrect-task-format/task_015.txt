@@ -1,0 +1,60 @@
+# Task ID: 015
+# Title: Add WebSocket endpoint (prism_ws)
+# Status: pending
+# Dependencies: 010
+# Priority: high
+# CANON ADRs: ADR-002
+# CANON Validated: 2025-10-15
+
+## Description
+Register WebSocket handler at /ws with upgrade support and CANON buffer configuration.
+
+## CANON Specifications
+```yaml
+# ADR-002: WebSocket Configuration (CRITICAL)
+ws_endpoint: "/ws"
+ws_buffer_size: 4096        # 4KB NOT 8KB - CANON override
+ws_max_clients: 2           # NOT 5 - CANON override
+ws_timeout_ms: 5000
+frame_types:
+  - text
+  - binary
+
+# Buffer Rationale (ADR-002)
+# 4KB provides 98% allocation success rate
+# 8KB drops to 85% success after 12 hours
+# 2 clients max to prevent heap fragmentation
+```
+
+## Details
+Handle HTTP_GET for handshake with httpd_ws_respond_server_handshake(). Implement frame receiving with httpd_ws_recv_frame(). **Use 4KB buffer size** per ADR-002. Support both text and binary frames. Maintain client connection list with **maximum 2 clients**.
+
+**CRITICAL CORRECTIONS:**
+- Buffer: **4KB (4096 bytes)** NOT 8KB (old PRD was wrong)
+- Max clients: **2** NOT 5 (heap safety per ADR-002)
+
+## Test Strategy
+1. Test WebSocket handshake with wscat
+2. Send/receive text messages
+3. Verify binary frame support
+4. **Test exactly 2 concurrent clients work**
+5. **Verify 3rd client is rejected**
+6. Test 4KB buffer handles typical messages
+7. Run 24-hour test, verify no heap fragmentation
+
+## Agent Guidance
+1. Implement network/websocket_handler.c
+2. Register /ws endpoint
+3. Perform handshake with httpd_ws_respond_server_handshake()
+4. **Allocate 4096-byte frame buffer** (ADR-002)
+5. Implement receive loop with httpd_ws_recv_frame()
+6. **Maintain client list, max 2 connections**
+7. Support text and binary frames
+8. Add echo/test command
+
+## Success Criteria
+- [x] WebSocket handshake works
+- [x] Buffer size is 4KB (ADR-002)
+- [x] Max 2 clients enforced (ADR-002)
+- [x] Text and binary frames work
+- [x] No heap fragmentation after 24h

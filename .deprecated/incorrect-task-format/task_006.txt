@@ -1,0 +1,42 @@
+# Task ID: 006
+# Title: Create error code system (prism_errors)
+# Status: pending
+# Dependencies: 001
+# Priority: medium
+# CANON ADRs: none (infrastructure)
+# CANON Validated: 2025-10-15
+
+## Description
+Define comprehensive error codes with HTTP status mapping for consistent error handling across all components.
+
+## CANON Specifications
+```yaml
+# Error System Configuration
+error_base: 0x9000  # PRISM error code base
+http_mapping: true   # Map errors to HTTP status
+logging: ESP_LOG_ERROR
+propagation: ESP_ERROR_CHECK_WITHOUT_ABORT
+```
+
+## Details
+Define prism_error_t enum with PRISM_OK, PRISM_ERR_BAD_REQUEST, PRISM_ERR_STORAGE_FULL, etc. Create error_to_http_status() mapping function. Use ESP_ERROR_CHECK_WITHOUT_ABORT for non-critical errors. Integrate with ESP-IDF error system.
+
+## Test Strategy
+1. Verify each error code maps to correct HTTP status
+2. Test error propagation through call stack
+3. Verify ESP_ERROR_CHECK_WITHOUT_ABORT allows recovery
+4. Test logging outputs correct severity
+5. Validate error codes don't conflict with ESP-IDF
+
+## Agent Guidance
+1. Create firmware/components/core/include/prism_errors.h
+2. Define error enum with ESP_ERR_PRISM_BASE
+3. Implement error_to_http_status() in error_handler.c
+4. Add error string descriptions
+5. Update modules to return prism_error_t
+
+## Success Criteria
+- [x] All error codes defined with unique values
+- [x] HTTP mapping function complete
+- [x] Error propagation tested
+- [x] No conflicts with ESP-IDF errors

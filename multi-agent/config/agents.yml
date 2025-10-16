@@ -1,0 +1,66 @@
+# Multi-Agent System - Agent Capabilities
+# Integrates with Knowledge Fortress (.taskmaster/)
+
+version: "1.0.0"
+
+agents:
+  agent-1-network:
+    name: "Network Specialist"
+    skills: [websocket, wifi, protocols, mdns]
+    max_concurrent_tasks: 2
+    priority_boost: [high]
+    reads_from:
+      - .taskmaster/CANON.md
+      - .taskmaster/decisions/ADR-*.md
+    writes_to:
+      - firmware/components/network/**
+    validation_required: true
+    
+  agent-2-storage:
+    name: "Storage Specialist"
+    skills: [filesystem, littlefs, caching, compression]
+    max_concurrent_tasks: 2
+    priority_boost: [high, medium]
+    reads_from:
+      - .taskmaster/CANON.md
+      - .taskmaster/decisions/ADR-*.md
+    writes_to:
+      - firmware/components/storage/**
+    validation_required: true
+    
+  agent-3-playback:
+    name: "Playback Specialist"
+    skills: [led-driver, effects, animation, rmt-peripheral]
+    max_concurrent_tasks: 1
+    critical_path: true
+    reads_from:
+      - .taskmaster/CANON.md
+      - .taskmaster/decisions/ADR-*.md
+    writes_to:
+      - firmware/components/playback/**
+    validation_required: true
+    
+  agent-4-integration:
+    name: "Integration Lead"
+    skills: [testing, debugging, optimization, profiling]
+    max_concurrent_tasks: 3
+    blocker_resolver: true
+    reads_from:
+      - .taskmaster/CANON.md
+      - .taskmaster/decisions/ADR-*.md
+      - .multi-agent/metrics/**
+    writes_to:
+      - firmware/**
+      - .taskmaster/research/[PROPOSED]/**
+    validation_required: true
+
+# Integration Rules
+integration:
+  canon_check: before-claim      # When to verify CANON sync
+  validation: after-implement     # When to run validate-canon.sh
+  max_retries: 3                  # Max retries on validation failure
+  
+  fortress_sync:
+    auto: true                    # Auto-sync with Knowledge Fortress
+    interval: 300                 # Check every 5 minutes
+    on_canon_change: notify-all   # Notify all agents on CANON update

@@ -1,0 +1,49 @@
+# Task ID: 013
+# Title: Implement pattern list endpoint
+# Status: pending
+# Dependencies: 011, 004
+# Priority: medium
+# CANON ADRs: ADR-005
+# CANON Validated: 2025-10-15
+
+## Description
+Create GET /api/patterns handler that returns JSON array of patterns stored at /littlefs.
+
+## CANON Specifications
+```yaml
+# ADR-005: Storage Paths
+index_path: "/littlefs/.index.json"  # NOT /prism/.index.json
+patterns_dir: "/littlefs/patterns"   # NOT /prism/patterns
+
+# Response Format
+content_type: "application/json"
+fields:
+  - uuid
+  - name
+  - size
+  - uploadTime
+  - duration
+```
+
+## Details
+Read **/littlefs/.index.json**, parse with cJSON, build response array. Handle empty index gracefully. All paths use **/littlefs** prefix per ADR-005.
+
+## Test Strategy
+1. Upload 3 patterns via task 012
+2. Verify GET /api/patterns returns all 3
+3. Check all metadata fields present
+4. Test with empty storage returns []
+5. Verify paths use /littlefs
+
+## Agent Guidance
+1. Implement GET /api/patterns in http_routes.c
+2. Load /littlefs/.index.json via prism_fs
+3. Parse JSON, build array response
+4. Return [] if index missing/empty
+5. Set Content-Type: application/json
+
+## Success Criteria
+- [x] Lists all patterns from /littlefs
+- [x] Returns correct JSON format
+- [x] Empty storage handled gracefully
+- [x] All metadata fields present

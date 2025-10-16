@@ -7,5 +7,77 @@ config PRISM_PROFILE_TEMPORAL
         Enable cycle-accurate profiling of temporal calculations.
         Adds small code size overhead. Disable in production.
 
+config PRISM_PROFILE_COUNT_DCACHE
+    bool "Profile DCache hit/miss rates"
+    depends on PRISM_PROFILE_TEMPORAL
+    default y
+    help
+        Collect data cache hit/miss counters using PMU (D_ACCESS_U1).
+        Adds two performance counters when enabled.
+
+config PRISM_PROFILE_COUNT_ICACHE
+    bool "Profile ICache hit/miss rates"
+    depends on PRISM_PROFILE_TEMPORAL
+    default y
+    help
+        Collect instruction cache hit/miss counters using PMU (I_MEM).
+        Adds two performance counters when enabled.
+
+config PRISM_PROFILE_COUNT_INSN
+    bool "Profile instruction count (INSN)"
+    depends on PRISM_PROFILE_TEMPORAL
+    default n
+    help
+        Collect successfully retired instruction count. May be skipped at
+        runtime if all PMU counters are used by cache profiling.
+
 endmenu
 
+menu "PRISM Metrics Exposure"
+
+config PRISM_METRICS_HTTP
+    bool "Expose profiling metrics via HTTP endpoint"
+    default y
+    help
+        Adds a JSON endpoint /metrics/wave to the captive portal HTTP server
+        that returns the current WAVE profiling statistics.
+
+config PRISM_METRICS_CLI
+    bool "Expose profiling metrics via CLI command"
+    default y
+    help
+        Registers a console command `prism_metrics` to print current metrics.
+
+config PRISM_METRICS_PROMETHEUS
+    bool "Expose Prometheus text endpoint (/metrics)"
+    depends on PRISM_METRICS_HTTP
+    default y
+    help
+        Adds a text/plain Prometheus exposition endpoint at /metrics.
+
+config PRISM_METRICS_CSV
+    bool "Expose CSV endpoint (/metrics.csv)"
+    depends on PRISM_METRICS_HTTP
+    default n
+    help
+        Adds a CSV snapshot endpoint for simple scripting.
+
+config PRISM_METRICS_PUSH
+    bool "Periodically push metrics to HTTP endpoint"
+    default n
+    help
+        When enabled, a background task will POST JSON metrics to the URL
+        configured below at the specified interval.
+
+config PRISM_METRICS_PUSH_URL
+    string "Metrics push URL (e.g., http://host:port/api/metrics)"
+    depends on PRISM_METRICS_PUSH
+    default ""
+
+config PRISM_METRICS_PUSH_INTERVAL_SEC
+    int "Metrics push interval (seconds)"
+    depends on PRISM_METRICS_PUSH
+    range 1 3600
+    default 10
+
+endmenu

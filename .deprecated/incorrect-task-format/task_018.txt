@@ -1,0 +1,58 @@
+# Task ID: 018
+# Title: Create execution engine task (prism_exec)
+# Status: pending
+# Dependencies: 001
+# Priority: high
+# CANON ADRs: ADR-003
+# CANON Validated: 2025-10-15
+
+## Description
+Implement FreeRTOS task for pattern execution with command queue and CANON LED configuration.
+
+## CANON Specifications
+```yaml
+# ADR-003: LED Configuration (CRITICAL)
+led_count: 320              # NOT 150 - CANON override
+led_type: WS2812B
+led_fps_target: 60
+
+# Task Configuration
+stack_size: 8192
+priority: tskIDLE_PRIORITY+5
+queue_depth: 16
+frame_interval_ms: 16       # ~60 FPS
+
+# Memory Budget
+led_buffer_size: 960        # 320 LEDs × 3 bytes (RGB)
+double_buffer: 1920         # 2 × 960 bytes
+```
+
+## Details
+Create task with 8KB stack, priority tskIDLE_PRIORITY+5. Implement command queue (depth 16). Main loop: check queue, update timeline, generate frame for **320 LEDs** (ADR-003), output at 60 FPS.
+
+**CRITICAL CORRECTION:** LED count is **320** NOT 150. Old PRD had wrong count. This affects buffer sizes and memory allocation.
+
+## Test Strategy
+1. Task starts without stack overflow
+2. Verify 60 FPS timing accurate
+3. Test command processing
+4. **Verify LED buffer sized for 320 LEDs**
+5. Test with maximum pattern complexity
+
+## Agent Guidance
+1. Create playback/prism_exec.h
+2. Define command types (play/pause/stop)
+3. **Define LED_COUNT 320 (ADR-003)**
+4. Create task: 8KB stack, priority tskIDLE_PRIORITY+5
+5. Implement queue depth 16
+6. Main loop: drain commands, update timeline, generate 320-LED frame
+7. Use esp_timer for 60 FPS timebase
+8. Integrate led_driver for output
+9. Expose API to enqueue commands
+
+## Success Criteria
+- [x] Task runs stably with 8KB stack
+- [x] LED_COUNT = 320 (ADR-003)
+- [x] 60 FPS timing maintained
+- [x] Command queue works
+- [x] No stack overflow

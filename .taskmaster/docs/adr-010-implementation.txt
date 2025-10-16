@@ -1,0 +1,271 @@
+# PRISM.K1 - LGP Motion Architecture Implementation
+
+## Overview
+
+Implement temporal sequencing system for dual-edge Light Guide Plate (LGP) enabling geometric shape creation through staggered LED timing. Based on ADR-010: LGP Motion Architecture.
+
+## Background
+
+Hardware: ESP32-S3 with dual-edge LGP (CH1 bottom, CH2 top, 160 LEDs each)
+Target: 120 FPS, 3.38ms CPU budget per frame
+Key Innovation: Temporal sequencing (30-200ms delays) creates geometric shapes via phi phenomenon
+
+## Implementation Phases
+
+### Phase 1: Foundation (Weeks 1-2)
+
+Implement core motion and sync mode infrastructure with simple modes.
+
+**Deliverables:**
+- Motion direction enum (LEFT, RIGHT, CENTER, EDGE, STATIC)
+- Sync mode enum (SYNC, OFFSET, PROGRESSIVE, WAVE, CUSTOM)
+- calculate_ch2_frame() function with SYNC and OFFSET modes
+- Update .prism format parser for v1.1 (add motion + sync_mode fields)
+- Unit tests for temporal calculations
+- 3 example patterns: SYNC, OFFSET rising, OFFSET falling
+
+**Files to create:**
+- firmware/components/playback/include/prism_motion.h
+- firmware/components/playback/prism_temporal.c
+- firmware/components/playback/test/test_prism_temporal.c
+
+**Integration points:**
+- Update prism_header_t in pattern_storage.h (add motion, sync_mode, sync_params)
+- Modify playback_task() in led_playback.c to call calculate_ch2_frame()
+- Update pattern parser in protocol_parser.c for v1.1 validation
+
+**Success criteria:**
+- SYNC mode renders identical frames to both channels (50% CPU savings verified)
+- OFFSET mode creates rising/falling effects with 150ms delay
+- All unit tests pass
+- No performance regression (stays within 3.38ms budget)
+
+### Phase 2: Shape Creation (Weeks 3-4)
+
+Implement PROGRESSIVE mode enabling triangular and wedge shapes.
+
+**Deliverables:**
+- PROGRESSIVE mode (linear interpolation across 160 LEDs)
+- 5 shape presets: right triangle, left triangle, diamond, chevron, gradient
+- Hardware validation with physical LGP (visual photos documenting shapes)
+- Performance profiling report at 120 FPS
+- Migration tool for v1.0 patterns to v1.1
+
+**Implementation:**
+- Linear delay interpolation: delay[i] = start + (end - start) * i / 159
+- Per-LED frame counter calculation in calculate_ch2_frame()
+- Preset pattern files (.prism) demonstrating each shape
+
+**Validation:**
+- Visual inspection: Verify triangular shapes appear on LGP surface
+- Timing measurement: High-speed camera @ 240 FPS validates delays
+- Phi phenomenon: Observer confirms geometric perception (not discrete zones)
+- Performance: Frame time profiling shows <2μs temporal overhead
+
+**Success criteria:**
+- Right triangle pattern creates diagonal from bottom-left to top-right
+- Diamond pattern blooms from center
+- PROGRESSIVE mode uses <0.1% CPU budget
+- Hardware photos confirm shapes match specification
+
+### Phase 3: Advanced Motion (Weeks 5-6)
+
+Implement WAVE mode with sinusoidal delay patterns.
+
+**Deliverables:**
+- WAVE mode with pre-computed lookup tables
+- Wave delay table generator (sin, triangle, sawtooth waveforms)
+- 3 wave presets: sine wave, sawtooth, triangle
+- CPU profiling report comparing LUT vs realtime sin()
+- Optimization: Inline functions for hot paths
+
+**Implementation:**
+- Pre-compute wave delays at effect start (160 entries × 2 bytes = 320 bytes)
+- Support amplitude, frequency, phase parameters
+- Three waveform types: sine (organic), triangle (sharp), sawtooth (directional)
+
+**Optimization:**
+- Lookup table eliminates realtime sin() calls (50 cycles → 5 cycles)
+- Static allocation (no heap fragmentation)
+- Inline calculate_ch2_frame() for WAVE mode (reduce function call overhead)
+
+**Success criteria:**
+- WAVE mode creates smooth vertical sine wave on LGP
+- LUT optimization reduces CPU cost from ~80μs to ~0.5μs
+- Wave patterns validated on hardware
+- No visual artifacts or timing glitches at 120 FPS
+
+### Phase 4: Expert Mode (Weeks 7-8)
+
+Implement CUSTOM mode with arbitrary per-LED delay maps.
+
+**Deliverables:**
+- CUSTOM mode (320-byte delay map support)
+- Web-based shape editor (drag-and-drop interface)
+- Delay map export to .prism format
+- 10+ community-created custom patterns
+- Pattern migration documentation (v1.0 → v1.1)
+
+**Web Editor Features:**
+- Visual LGP preview with real-time delay visualization
+- Drag control points to create custom delay curves
+- Export to .prism binary format
+- Import existing patterns for modification
+- Preset library (load triangle, diamond, wave templates)
+
+**Implementation:**
+- Direct array lookup: delay_ms = g_custom_delay_map[led_index]
+- Validate delay map during pattern upload (0-500ms range)
+- Store delay map after header in .prism file (offset tracking)
+
+**Success criteria:**
+- Web editor generates valid .prism files with CUSTOM mode
+- At least 10 unique custom patterns created and tested
+- CUSTOM mode performance verified (<0.5μs per frame)
+- Migration tool successfully upgrades all v1.0 test patterns
+
+### Phase 5: Polish & Documentation (Weeks 9-10)
+
+Finalize user documentation, tutorials, and production release.
+
+**Deliverables:**
+- Comprehensive user manual (temporal sequencing guide)
+- 5 video tutorials on YouTube (10-15 minutes each)
+- 24-hour hardware soak test (memory leak validation)
+- Production firmware v1.1 release
+- Pattern preset library (20+ patterns demonstrating all modes)
+
+**Documentation Topics:**
+1. Introduction to temporal sequencing (phi phenomenon explanation)
+2. Motion directions explained (LEFT, RIGHT, CENTER, EDGE)
+3. Sync modes deep-dive (SYNC, OFFSET, PROGRESSIVE, WAVE, CUSTOM)
+4. Shape creation tutorial (how to make triangles, diamonds, waves)
+5. Advanced techniques (combining motion + sync + color)
+
+**Soak Test:**
+- Run 24+ hours continuous operation at 120 FPS
+- Cycle through all 20+ preset patterns (1 hour each)
+- Monitor heap fragmentation (must stay <5%)
+- Verify no frame drops or timing glitches
+- Temperature monitoring (thermal throttling check)
+
+**Success criteria:**
+- User manual complete with screenshots and examples
+- All 5 video tutorials published and accessible
+- 24-hour soak test passes without errors
+- Production firmware tested on 3+ hardware units
+- Pattern library covers all motion × sync mode combinations
+
+## Technical Constraints
+
+**Performance:**
+- Target: 120 FPS (8.33ms per frame)
+- CPU budget: 3.38ms per frame
+- LED transmission: 4.8ms (hardware RMT, parallel)
+- Temporal overhead: <2μs (<0.06% of budget)
+
+**Memory:**
+- Static allocations only (no heap in render loop)
+- Wave LUT: 320 bytes
+- Custom delay map: 320 bytes maximum
+- Total temporal overhead: <1KB RAM
+
+**Format:**
+- .prism v1.1 header: 70 bytes (was 64 bytes)
+- Backward compatible with v1.0 patterns
+- CRC32 validation on header + params
+
+## Validation Requirements
+
+**Unit Tests:**
+- calculate_ch2_frame() accuracy for all sync modes
+- Linear interpolation correctness (PROGRESSIVE)
+- Wave LUT generation and lookup
+- Boundary conditions (LED 0, LED 159, extreme delays)
+- v1.0 to v1.1 migration correctness
+
+**Hardware Tests:**
+- Visual shape validation (camera photos)
+- Timing measurement (high-speed camera @ 240 FPS)
+- Performance profiling (frame time measurement)
+- 24-hour soak test (stability)
+- Multi-pattern cycling (pattern switching stability)
+
+**Success Metrics:**
+- All unit tests pass (100% coverage on temporal functions)
+- Frame time: <3.38ms for all sync modes
+- Visual shapes match specification (triangles point correct direction)
+- Zero frame drops in 24-hour test
+- Heap fragmentation: <5% after 24 hours
+
+## Dependencies
+
+**External:**
+- ESP-IDF v5.x (FreeRTOS, RMT driver)
+- Math utilities: sin8() lookup table from ADR-009
+- Pattern storage: LittleFS, pattern_storage.c
+- Network upload: protocol_parser.c (TLV frames)
+
+**Internal:**
+- ADR-009: PRISM Pattern Format (effect system)
+- ADR-003: LED Configuration (dual-channel RMT)
+- ADR-005: Storage Mount Path (/littlefs)
+- Task 4: Protocol parser (pattern upload)
+- Task 5: Pattern storage (CRUD operations)
+- Task 8: LED driver (120 FPS playback)
+
+## Risks & Mitigations
+
+**Risk 1: Phi phenomenon doesn't work as expected on hardware**
+- Mitigation: Early hardware validation in Phase 2
+- Fallback: Adjust delay ranges based on actual perception testing
+
+**Risk 2: Performance overhead exceeds budget**
+- Mitigation: Lookup table optimizations, inline functions
+- Fallback: Limit CUSTOM mode to 80 LEDs (reduce map size)
+
+**Risk 3: User confusion with temporal sequencing concepts**
+- Mitigation: Comprehensive video tutorials, preset library
+- Fallback: Ship with SYNC mode as default (80% never change)
+
+**Risk 4: Web editor complexity delays Phase 4**
+- Mitigation: MVP editor first (basic curve control)
+- Fallback: CLI tool for CUSTOM mode delay map generation
+
+## Success Criteria
+
+**Phase 1 Complete:**
+- SYNC and OFFSET modes functional
+- v1.1 format parser working
+- Unit tests passing
+
+**Phase 2 Complete:**
+- PROGRESSIVE mode creates visible triangles on hardware
+- 5 shape presets validated
+- Performance within budget
+
+**Phase 3 Complete:**
+- WAVE mode creates smooth organic motion
+- LUT optimization verified
+- Wave presets working
+
+**Phase 4 Complete:**
+- CUSTOM mode functional
+- Web editor generates valid patterns
+- 10+ community patterns created
+
+**Phase 5 Complete:**
+- Documentation published
+- Video tutorials live
+- 24-hour soak test passed
+- Production v1.1 firmware released
+
+## Timeline
+
+- **Week 1-2:** Phase 1 (Foundation)
+- **Week 3-4:** Phase 2 (Shape Creation)
+- **Week 5-6:** Phase 3 (Advanced Motion)
+- **Week 7-8:** Phase 4 (Expert Mode)
+- **Week 9-10:** Phase 5 (Polish & Documentation)
+
+**Total: 10 weeks** (2.5 months)

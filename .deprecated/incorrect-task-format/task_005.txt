@@ -1,0 +1,44 @@
+# Task ID: 005
+# Title: Implement hash functions (prism_hash)
+# Status: pending
+# Dependencies: 001
+# Priority: high
+# CANON ADRs: ADR-004
+# CANON Validated: 2025-10-15
+
+## Description
+Create CRC32 and SHA256 implementations using ESP32 ROM functions and mbedTLS for pattern file verification.
+
+## CANON Specifications
+```yaml
+# Pattern File Validation (ADR-004)
+pattern_max_size: 262144  # 256KB - hash this much data
+hash_algorithms:
+  - CRC32 (esp_rom_crc32_le)
+  - SHA256 (mbedtls)
+verification_required: true
+```
+
+## Details
+CRC32: Use esp_rom_crc32_le() from ROM for efficient checksums. SHA256: Use mbedtls_sha256_context with proper init/update/finish pattern. Create hex conversion utility. Add streaming hash support for large pattern files up to 256KB.
+
+## Test Strategy
+1. Verify CRC32 against NIST test vectors
+2. Verify SHA256 against known test vectors
+3. Test streaming hash for 256KB file matches single-shot
+4. Benchmark performance on ESP32-S3
+5. Test with pattern files at maximum size (262144 bytes)
+
+## Agent Guidance
+1. Create firmware/components/core/include/prism_hash.h
+2. Implement prism_crc32() using esp_rom_crc32_le()
+3. Implement prism_sha256() using mbedtls
+4. Add streaming APIs for large files
+5. Create hex conversion helpers
+6. Add Unity tests with NIST vectors
+
+## Success Criteria
+- [x] CRC32 matches NIST test vectors
+- [x] SHA256 matches test vectors
+- [x] Streaming hash works for 256KB files (ADR-004 max)
+- [x] Performance acceptable (<100ms for 256KB)

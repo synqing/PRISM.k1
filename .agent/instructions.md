@@ -420,7 +420,7 @@ Key Files:
 │   ├── config.json               # AI model config
 │   └── docs/
 │       ├── README.md              # ⭐ SOURCE OF TRUTH INDEX
-│       ├── PRISM_AUTHORITATIVE_SPECIFICATION.md  # ⭐ FINAL TECH SPEC
+│       ├── CANON.md                              # ⭐ SINGLE SOURCE OF TRUTH (auto-generated)
 │       ├── prism-firmware-prd.txt # Product requirements
 │       └── research/              # Evidence & analysis
 │
@@ -432,7 +432,7 @@ Key Files:
     └── mcp-usage.md              # Tool reference
 ```
 
-**⚠️ CRITICAL:** Always reference `.taskmaster/docs/PRISM_AUTHORITATIVE_SPECIFICATION.md` for technical decisions!
+**⚠️ CRITICAL:** Always reference `.taskmaster/CANON.md` for technical decisions! (Auto-generated from approved ADRs)
 
 ### External Documentation
 

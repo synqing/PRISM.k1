@@ -1,0 +1,51 @@
+# Task ID: 017
+# Title: Implement WebSocket client management
+# Status: pending
+# Dependencies: 015, 016
+# Priority: medium
+# CANON ADRs: ADR-002
+# CANON Validated: 2025-10-15
+
+## Description
+Track connected WebSocket clients and enable broadcasting with CANON client limit.
+
+## CANON Specifications
+```yaml
+# ADR-002: Client Limits (CRITICAL CORRECTION)
+ws_max_clients: 2           # NOT 5 - heap safety
+client_tracking: array
+broadcast: async
+backpressure: required
+
+# Rationale (ADR-002)
+# 2 clients prevents heap fragmentation
+# Each client: 4KB buffer + overhead
+# Total: ~10KB for WebSocket subsystem
+```
+
+## Details
+Maintain array of **maximum 2 client file descriptors** (ADR-002). Add clients on connection, remove on disconnect. Implement broadcast function for events. Use httpd_ws_send_frame_async() for non-blocking sends. **Reject 3rd client connection.**
+
+**CRITICAL CORRECTION:** Max clients is **2** NOT 5. Old PRD value conflicts with ADR-002 heap safety requirements.
+
+## Test Strategy
+1. **Connect 2 clients, verify both receive broadcasts**
+2. **Connect 3rd client, verify rejection**
+3. Test client disconnect cleanup
+4. Verify broadcast doesn't block
+5. Test backpressure handling
+
+## Agent Guidance
+1. Implement fixed-size client table (max 2)
+2. Add on-connect/on-disconnect hooks
+3. **Enforce client_count <= 2, reject excess**
+4. Implement broadcast using httpd_ws_send_frame_async()
+5. Handle backpressure
+6. Test with 3 connection attempts
+
+## Success Criteria
+- [x] Exactly 2 clients supported (ADR-002)
+- [x] 3rd client rejected gracefully
+- [x] Broadcast works to all connected clients
+- [x] No blocking on send
+- [x] Cleanup on disconnect

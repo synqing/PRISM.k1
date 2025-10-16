@@ -1,0 +1,26 @@
+#!/bin/bash
+# Collect Multi-Agent Metrics
+
+mkdir -p .multi-agent/metrics
+
+TODAY=$(date +%Y%m%d)
+METRICS_FILE=".multi-agent/metrics/${TODAY}.json"
+
+# Count completed tasks
+COMPLETED=$(find .multi-agent/.locks -name "*.completed-*" -mtime -1 2>/dev/null | wc -l | tr -d ' ')
+
+# Calculate average time (simplified)
+AVG_TIME="TODO"
+
+# Count violations
+VIOLATIONS=$(grep -r "VIOLATION" .multi-agent/logs/*.log 2>/dev/null | wc -l | tr -d ' ')
+
+cat > "$METRICS_FILE" <<EOF
+{
+  "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "tasks_completed": $COMPLETED,
+  "average_completion_time": "$AVG_TIME",
+  "canon_violations": $VIOLATIONS,
+  "build_failures": 0,
+  "agents_active": $(find .multi-agent/.locks -name "*.claim" 2>/dev/null | wc -l | tr -d ' ')
+}

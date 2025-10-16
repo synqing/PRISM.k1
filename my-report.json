@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-10-15T16:15:29.185Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Establish component scaffolding and runtime orchestration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create subtasks to 1) scaffold the four ESP-IDF components with headers/sources/CMakeLists, 2) update the top-level CMake configuration and shared include exports, 3) extend main.c to invoke each init routine and spawn FreeRTOS tasks with agreed stack/priority settings, 4) centralize init error handling and propagation, and 5) add initial Unity smoke tests plus idf.py build verification.",
+			"reasoning": "Work is mostly structural but spans multiple components, build integration, and FreeRTOS orchestration; moderate coordination and regression risk but limited algorithmic depth."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Implement WiFi lifecycle, captive portal, and mDNS broadcasting",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break into subtasks for WiFi dual-mode initialization, captive portal HTTP server with credential capture, STA onboarding and NVS persistence, reconnect/backoff event handling, mDNS registration, runtime task loop/state broadcasting, and unit/integration test coverage including hardware verification plan.",
+			"reasoning": "Combines networking, HTTP portal, persistent storage, and resilient event-driven WiFi management with hardware validation; high surface area and multiple failure modes raise complexity."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Build WebSocket server with TLV-aware session management",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Define subtasks covering HTTP upgrade and connection tracking, RX buffer allocation and pooling, TLV state machine implementation with timers, concurrency limits and rejection handling, status frame publication, reconnect/backoff logic, and comprehensive unit/integration testing for throughput and error paths.",
+			"reasoning": "Requires robust asynchronous WebSocket handling with custom TLV protocol, resource limits, and recovery behavior; concurrency and reliability needs make it high complexity."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Implement TLV protocol parser and command dispatcher",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Outline subtasks to design protocol data structures/context, implement TLV parsing with validation and CRC handling, manage upload session state and size enforcement, wire command dispatch hooks to storage/playback subsystems, emit error/status responses, and author parser unit/integration tests.",
+			"reasoning": "Parsing and dispatch layer must be precise, maintain ordered state, and coordinate multiple subsystems; moderate-to-high complexity due to error handling and integration breadth."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Integrate LittleFS storage and pattern persistence APIs",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Create subtasks for LittleFS mount/initialization, API surface for CRUD operations, quota/CRC enforcement logic, template directory management with atomic writes, integration hooks for protocol callbacks, and unit plus hardware persistence testing.",
+			"reasoning": "Filesystem integration with quota management and CRC enforcement involves careful resource handling but leverages IDF primitives; testing requires both mocks and device checks."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Create .prism pattern format parser and metadata validation",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Plan subtasks for defining header/layout structures, implementing header and palette parsing with bounds checks, developing delta-decode routines optimized for streaming, exposing serialization helpers for STATUS responses, and building fuzz/unit benchmarks validating correctness and timing.",
+			"reasoning": "Custom binary format parsing with strict validation and performance goals introduces notable algorithmic and robustness complexity."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Implement RAM hot cache with LRU eviction and preloading",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into subtasks for cache configuration and memory pool setup, LRU metadata and eviction logic, preload workflow tied to templates, storage/cache integration for loading and palette sharing, telemetry reporting hooks, and long-running/unit tests for eviction correctness and heap stability.",
+			"reasoning": "Balancing memory constraints, performance, and integration with storage/playback requires careful design and validation, elevating complexity."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Develop RMT-based LED driver with double buffering",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Enumerate subtasks for RMT channel/encoder configuration, DMA-capable buffer allocation and lifecycle, ISR-safe double-buffer swap mechanism, frame scheduling via timer/semaphores, public driver APIs for playback integration, diagnostics/logging for underruns, and hardware plus simulated timing tests.",
+			"reasoning": "Low-level timing-critical driver work with DMA buffers and real-time scheduling is intricate and hardware-sensitive, demanding extensive validation."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Build effect engine with parameter interpolation and crossfade scheduler",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Create subtasks to model pattern descriptor/state structures, implement rendering pipeline with interpolation and crossfade logic, integrate 60 FPS timer callbacks and main loop coordination, optimize inner loops for CPU budget, connect to LED driver/cache interfaces, expose control APIs, and craft performance plus integration tests covering transitions.",
+			"reasoning": "Complex real-time rendering pipeline balancing CPU limits, smooth transitions, and subsystem coordination; algorithmic and performance tuning drive high complexity."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Deliver template system with 15 categorized patterns and deployment flow",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Plan subtasks for authoring template descriptors/palettes, boot-time copy/install workflow, metadata registry and category lookups, cache preload integration, protocol/WebSocket deployment hooks, and tests verifying storage footprint, deployment latency, and metadata exposure.",
+			"reasoning": "Requires significant content definition plus orchestration across storage, cache, and playback systems with careful first-boot handling and regression coverage."
+		}
+	]
+}

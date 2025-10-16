@@ -1,0 +1,63 @@
+# Task ID: 012
+# Title: Implement streaming upload handler
+# Status: pending
+# Dependencies: 011, 004, 005
+# Priority: high
+# CANON ADRs: ADR-004, ADR-005
+# CANON Validated: 2025-10-15
+
+## Description
+Create multipart upload handler with progress tracking, SHA256 verification, and CANON size limits.
+
+## CANON Specifications
+```yaml
+# ADR-004: Upload Constraints (CRITICAL)
+pattern_max_size: 262144    # 256KB limit (NOT 200KB!)
+chunk_size: 4096            # 4KB chunks
+hash_algorithm: SHA256
+atomic_commit: required
+
+# ADR-005: Upload Paths
+upload_staging: "/littlefs/.upload"  # NOT /prism/.upload
+final_path: "/littlefs/patterns"     # NOT /prism/patterns
+
+# Upload Configuration
+header: "X-PRISM-SHA256"    # SHA256 verification
+progress: "WebSocket optional"
+timeout_ms: 30000
+```
+
+## Details
+Use httpd_req_recv() in 4KB chunks. Write to **/littlefs/.upload/** temporary file. Calculate SHA256 during upload. **REJECT files larger than 262144 bytes** (ADR-004). Verify against X-PRISM-SHA256 header. Atomic rename to **/littlefs/patterns/** on success.
+
+**CRITICAL CORRECTION:** Maximum pattern size is **256KB (262144 bytes)**, NOT 200KB (204800 bytes) from old PRD.
+
+## Test Strategy
+1. Upload 50KB file, verify SHA256 matches
+2. **Upload 256KB file, verify success (at limit)**
+3. **Upload 257KB file, verify rejection with 413 status**
+4. Test interrupted upload cleanup
+5. Verify atomic commit (no partial files)
+6. Test SHA256 mismatch rejection
+7. Verify files written to /littlefs/.upload then /littlefs/patterns
+
+## Agent Guidance
+1. Implement network/upload_handler.c
+2. Read httpd_req_recv() in 4KB chunks
+3. **Check size <= 262144, reject if exceeded**
+4. Write to /littlefs/.upload/<uuid>.tmp
+5. Stream SHA256 using prism_hash
+6. Compare with X-PRISM-SHA256 header
+7. Atomic rename to /littlefs/patterns/ on success
+8. Update /littlefs/.index.json
+9. Cleanup on error
+10. Optional: WebSocket progress broadcast
+
+## Success Criteria
+- [x] Uploads up to 256KB succeed (ADR-004)
+- [x] Files >256KB rejected with 413
+- [x] SHA256 verification works
+- [x] Atomic commit prevents partial files
+- [x] Paths use /littlefs (ADR-005)
+- [x] Cleanup on errors
+- [x] Index updated on success

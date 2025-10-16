@@ -1,0 +1,51 @@
+# Task ID: 011
+# Title: Implement REST endpoint routing
+# Status: pending
+# Dependencies: 010
+# Priority: high
+# CANON ADRs: ADR-004, ADR-005
+# CANON Validated: 2025-10-15
+
+## Description
+Create URI handlers for all REST endpoints with proper HTTP methods, using CANON paths and limits.
+
+## CANON Specifications
+```yaml
+# REST Endpoints (CANON-aligned)
+endpoints:
+  - POST /api/patterns      # Upload (max 256KB per ADR-004)
+  - GET /api/patterns       # List from /littlefs (ADR-005)
+  - DELETE /api/patterns/:id
+  - POST /api/play
+  - POST /api/playlist
+  - GET /api/status
+
+# Path Configuration
+storage_path: "/littlefs"   # ADR-005
+pattern_max_size: 262144    # ADR-004 (256KB limit)
+```
+
+## Details
+Register handlers using httpd_register_uri_handler() for each endpoint. All storage operations use **/littlefs** paths per ADR-005. Upload endpoint enforces 256KB limit per ADR-004.
+
+## Test Strategy
+1. Test each endpoint with curl -k
+2. Verify correct HTTP status codes
+3. Test POST /api/patterns rejects files >256KB
+4. Verify GET /api/patterns reads from /littlefs
+5. Test all HTTP methods (GET, POST, DELETE)
+
+## Agent Guidance
+1. Create network/http_routes.c
+2. Implement route stubs for each endpoint
+3. Add URI parsing helpers for path params
+4. Use cJSON for request/response bodies
+5. Enforce pattern_max_size: 262144 on upload
+6. All file paths use /littlefs prefix
+
+## Success Criteria
+- [x] All 6 endpoints registered
+- [x] Uploads respect 256KB limit (ADR-004)
+- [x] Storage paths use /littlefs (ADR-005)
+- [x] Correct HTTP status codes
+- [x] JSON parsing works

@@ -1,0 +1,459 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://prism.k1/schemas/template-metadata.json",
+  "title": "PRISM Template Metadata Schema",
+  "description": "Defines the metadata structure for PRISM firmware-embedded LED pattern templates",
+  "version": "1.0.0",
+
+  "definitions": {
+    "templateCategory": {
+      "type": "string",
+      "enum": ["ambient", "energy", "artistic"],
+      "description": "Template category classification"
+    },
+
+    "parameterType": {
+      "type": "string",
+      "enum": ["float", "int", "bool", "color"],
+      "description": "Parameter data type"
+    },
+
+    "floatParameter": {
+      "type": "object",
+      "required": ["name", "type", "min", "max", "default"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "description": "Parameter identifier (snake_case)"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "Human-readable parameter name"
+        },
+        "type": {
+          "const": "float"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value (inclusive)"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value (inclusive)"
+        },
+        "default": {
+          "type": "number",
+          "description": "Default value"
+        },
+        "step": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "description": "Increment step for UI controls"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Parameter description for UI"
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 16,
+          "description": "Unit of measurement (e.g., 'Hz', 'ms', '%')"
+        }
+      }
+    },
+
+    "intParameter": {
+      "type": "object",
+      "required": ["name", "type", "min", "max", "default"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "type": {
+          "const": "int"
+        },
+        "min": {
+          "type": "integer"
+        },
+        "max": {
+          "type": "integer"
+        },
+        "default": {
+          "type": "integer"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 16
+        }
+      }
+    },
+
+    "boolParameter": {
+      "type": "object",
+      "required": ["name", "type", "default"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "type": {
+          "const": "bool"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+
+    "colorParameter": {
+      "type": "object",
+      "required": ["name", "type", "default"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "type": {
+          "const": "color"
+        },
+        "default": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360,
+          "description": "Default hue value (0-360)"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+
+    "performanceProfile": {
+      "type": "object",
+      "required": ["minFps", "targetFps", "updatePeriodMs", "powerFactor"],
+      "properties": {
+        "minFps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "Minimum FPS required for this pattern"
+        },
+        "targetFps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "Target FPS for best visual effect"
+        },
+        "updatePeriodMs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Milliseconds between pattern updates"
+        },
+        "cycleTimeMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Full pattern cycle duration (0 = infinite)"
+        },
+        "powerFactor": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Relative power consumption (0.0-1.0)"
+        }
+      }
+    },
+
+    "memoryProfile": {
+      "type": "object",
+      "required": ["compressedBytes", "runtimeBytes", "cpuPercent"],
+      "properties": {
+        "compressedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Compressed pattern size in bytes"
+        },
+        "runtimeBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "RAM usage during playback"
+        },
+        "cpuPercent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Average CPU load percentage"
+        }
+      }
+    }
+  },
+
+  "type": "object",
+  "required": ["id", "version", "name", "category", "description", "parameters", "performance", "memory"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^pattern_[0-9]{3}$",
+      "description": "Unique template identifier (e.g., 'pattern_001')",
+      "examples": ["pattern_001", "pattern_015"]
+    },
+
+    "numericId": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 15,
+      "description": "Numeric template ID (0x01-0x0F)"
+    },
+
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Template version (semantic versioning)",
+      "examples": ["1.0.0", "1.2.3"]
+    },
+
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "description": "Human-readable template name",
+      "examples": ["Ocean Wave", "Rave Pulse", "Aurora Borealis"]
+    },
+
+    "category": {
+      "$ref": "#/definitions/templateCategory",
+      "description": "Template category for organization"
+    },
+
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Detailed template description"
+    },
+
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 16
+      },
+      "minItems": 0,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "description": "Searchable tags for template discovery",
+      "examples": [["calm", "blue", "water"], ["party", "fast", "colorful"]]
+    },
+
+    "previewUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to preview GIF/video (optional, for future CDN support)"
+    },
+
+    "thumbnailData": {
+      "type": "string",
+      "pattern": "^data:image/(png|jpeg|gif);base64,[A-Za-z0-9+/=]+$",
+      "description": "Base64-encoded thumbnail image (embedded, <10KB)",
+      "maxLength": 15000
+    },
+
+    "author": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "description": "Template author information"
+    },
+
+    "parameters": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"$ref": "#/definitions/floatParameter"},
+          {"$ref": "#/definitions/intParameter"},
+          {"$ref": "#/definitions/boolParameter"},
+          {"$ref": "#/definitions/colorParameter"}
+        ]
+      },
+      "minItems": 3,
+      "maxItems": 8,
+      "description": "Template parameters (3-8 custom + universal params)"
+    },
+
+    "universalParameters": {
+      "type": "object",
+      "required": ["brightness", "speed", "scale"],
+      "properties": {
+        "brightness": {
+          "type": "object",
+          "required": ["default"],
+          "properties": {
+            "default": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
+        "speed": {
+          "type": "object",
+          "required": ["default"],
+          "properties": {
+            "default": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 10.0
+            }
+          }
+        },
+        "scale": {
+          "type": "object",
+          "required": ["default"],
+          "properties": {
+            "default": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 4.0
+            }
+          }
+        }
+      },
+      "description": "Default values for universal parameters"
+    },
+
+    "performance": {
+      "$ref": "#/definitions/performanceProfile",
+      "description": "Performance characteristics"
+    },
+
+    "memory": {
+      "$ref": "#/definitions/memoryProfile",
+      "description": "Memory usage profile"
+    },
+
+    "firmwareVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Minimum firmware version required",
+      "examples": ["1.0.0"]
+    },
+
+    "ledCount": {
+      "type": "object",
+      "required": ["min", "max", "recommended"],
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum LEDs for proper effect"
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum LEDs supported"
+        },
+        "recommended": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Recommended LED count for best effect"
+        }
+      },
+      "description": "LED count constraints"
+    },
+
+    "features": {
+      "type": "object",
+      "properties": {
+        "supportsBlending": {
+          "type": "boolean",
+          "description": "Can be blended with other patterns"
+        },
+        "supportsReverse": {
+          "type": "boolean",
+          "description": "Can play in reverse"
+        },
+        "supportsLooping": {
+          "type": "boolean",
+          "description": "Can loop seamlessly"
+        },
+        "requiresAudio": {
+          "type": "boolean",
+          "description": "Requires audio input (future feature)"
+        }
+      },
+      "description": "Template feature flags"
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Template creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        },
+        "deprecated": {
+          "type": "boolean",
+          "description": "Template is deprecated"
+        },
+        "replacedBy": {
+          "type": "string",
+          "pattern": "^pattern_[0-9]{3}$",
+          "description": "ID of replacement template if deprecated"
+        }
+      },
+      "description": "Administrative metadata"
+    }
+  }
+}

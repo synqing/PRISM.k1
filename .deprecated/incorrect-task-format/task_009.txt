@@ -1,0 +1,46 @@
+# Task ID: 009
+# Title: Generate self-signed certificate for HTTPS
+# Status: pending
+# Dependencies: 001
+# Priority: high
+# CANON ADRs: ADR-002 (WebSocket over HTTPS)
+# CANON Validated: 2025-10-15
+
+## Description
+Create and embed self-signed certificate for HTTPS server required for secure WebSocket connections.
+
+## CANON Specifications
+```yaml
+# HTTPS Configuration (supports WebSocket)
+certificate_type: "self-signed RSA 2048-bit"
+validity: 365  # days
+embedded: true  # compiled into firmware
+ws_over_https: true  # WebSocket requires HTTPS
+```
+
+## Details
+Generate 2048-bit RSA certificate with openssl. Embed as string literals in network component. Certificate enables HTTPS which is required for secure WebSocket connections (ws_buffer_size: 4096 per ADR-002).
+
+## Test Strategy
+1. Verify certificate loads correctly
+2. Test HTTPS connection with curl -k
+3. Check certificate details with openssl x509
+4. Verify WebSocket can connect over HTTPS
+5. Confirm certificate doesn't expire during development
+
+## Agent Guidance
+1. Generate certificate:
+   ```bash
+   openssl req -x509 -newkey rsa:2048 -keyout server_key.pem \
+     -out server_cert.pem -days 365 -nodes \
+     -subj "/CN=prism-k1.local"
+   ```
+2. Convert to C string arrays
+3. Embed in network/include/certs.h
+4. Add size checks at compile time
+
+## Success Criteria
+- [x] Certificate generated successfully
+- [x] Embedded in firmware as const char*
+- [x] HTTPS server loads certificate
+- [x] WebSocket connections work over HTTPS

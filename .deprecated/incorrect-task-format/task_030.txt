@@ -1,0 +1,28 @@
+# Task ID: 030
+# Title: Implement power-loss recovery
+# Status: pending
+# Dependencies: 004, 029
+# Priority: medium
+# CANON ADRs: ADR-001, ADR-005
+# CANON Validated: 2025-10-15
+
+## Description
+(Task description inherited from PRD with CANON corrections applied)
+
+## CANON Specifications
+See CANON.md for authoritative specifications referenced by ADRs above.
+
+## Test Strategy
+(Inherited from original task definition in tasks.json)
+
+## Agent Guidance
+1. Review CANON.md for ADR specifications
+2. Implement task requirements with CANON values
+3. Test against CANON constraints
+4. Validate compliance with referenced ADRs
+
+## Success Criteria
+- [ ] Task completed per original requirements
+- [ ] CANON specifications applied correctly
+- [ ] All ADR constraints validated
+- [ ] Tests pass

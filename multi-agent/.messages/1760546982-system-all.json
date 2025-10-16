@@ -1,0 +1,8 @@
+{
+    "from": "system",
+    "to": "all",
+    "type": "canon-updated",
+    "message": "CANON.md changed. Re-read specifications before claiming new tasks.",
+    "timestamp": "2025-10-15T16:49:42Z",
+    "read": false
+}

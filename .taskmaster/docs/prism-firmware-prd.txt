@@ -1,4 +1,6 @@
 # PRISM K1 Firmware Implementation PRD
+# CANON-Corrected Version - 2025-10-15
+# All specifications aligned with ADRs 001-006
 
 ## Overview
 Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, WebSocket control, and 15-20 template patterns. Focus on reliability, minimal memory footprint, and instant pattern switching via structural efficiency (not compression).
@@ -13,7 +15,7 @@ Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, Web
 - Memory: <150KB heap usage at runtime, zero fragmentation after 24h
 - Performance: <100ms pattern switch, 60 FPS LED output
 - Reliability: 99.9% uptime, graceful WiFi recovery
-- Storage: 25-35 patterns in 1.47MB LittleFS
+- Storage: 15+ patterns in 1.5MB LittleFS (ADR-006: expandable if memory permits)
 - Templates: 15 working patterns on first boot
 - Protocol: WebSocket stable at 500KB/s transfer
 
@@ -22,13 +24,15 @@ Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, Web
 ### WebSocket Communication Layer
 - Binary protocol with TLV message structure
 - Message types: PUT_BEGIN, PUT_DATA, PUT_END, CONTROL, STATUS
-- 8KB receive buffer (prevents fragmentation)
+- 4KB receive buffer (ADR-002: prevents fragmentation, 98% success rate)
+- 2 max concurrent clients (ADR-002: heap safety)
 - Automatic reconnection with exponential backoff
 - Error codes: 0x01 (busy), 0x02 (storage full), 0x03 (invalid format)
 
 ### Storage System (LittleFS)
-- Partition: 1.47MB usable space
-- File structure: /patterns/*.prism, /templates/*.prism
+- Partition: 1.5MB usable space (ADR-001: 0x180000 at offset 0x311000)
+- Mount path: /littlefs (ADR-005)
+- File structure: /littlefs/patterns/*.prism, /littlefs/templates/*.prism
 - Structural efficiency: Shared palettes, delta encoding, hot cache
 - Pattern header: 1KB metadata (uncompressed for instant access)
 - Write verification with CRC32
@@ -36,12 +40,13 @@ Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, Web
 ### Pattern Playback Engine
 - Double-buffered LED output (no flicker)
 - 60 FPS update rate via hardware timer
+- 320 LEDs supported (ADR-003)
 - Effect blending with crossfade
 - Parameter interpolation (smooth transitions)
 - Hot cache: 3-5 patterns in RAM for instant switching
 
 ### Template System
-- 15 patterns pre-loaded in flash
+- 15 patterns pre-loaded in flash (ADR-006: minimum count)
 - Categories: Ambient (5), Energy (5), Special (5)
 - One-click deployment via WebSocket
 - Template metadata: name, preview, parameters
@@ -59,7 +64,7 @@ Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, Web
 - MCU: ESP32-S3 (dual-core 240MHz)
 - RAM: 512KB total (300KB usable after system)
 - Flash: 8MB (6.5MB for firmware + storage)
-- LED Output: WS2812B protocol via RMT peripheral
+- LED Output: WS2812B protocol via RMT peripheral (320 LEDs - ADR-003)
 - Power: USB-C (5V 2A minimum)
 
 ## Firmware Modules
@@ -68,13 +73,17 @@ Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, Web
 - esp_system_init.c
   - ESP-IDF v5.x initialization, partition table, NVS setup
 - memory_manager.c
-  - Custom allocator with fragmentation monitoring, heap statistics
+  - Memory pool implementation (ADR: prevents fragmentation)
+  - Heap monitoring with statistics
+  - Pool sizes: 8×4KB, 16×1KB, 32×256B = 56KB reserved
 - error_handler.c
   - Error codes, logging, graceful degradation
 
 ### Communication Layer (Week 1)
 - websocket_handler.c
   - Binary frame parsing, message queue, state machine
+  - 4KB buffer size (ADR-002)
+  - 2 client maximum (ADR-002)
 - protocol_parser.c
   - TLV decoding, CRC validation, command dispatch
 - network_manager.c
@@ -82,15 +91,18 @@ Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, Web
 
 ### Storage Layer (Week 2)
 - pattern_storage.c
-  - LittleFS operations, file management, space monitoring
+  - LittleFS operations at /littlefs (ADR-005)
+  - File management, space monitoring
 - pattern_format.c
   - .prism format parser, header extraction, validation
+  - 256KB maximum pattern size (ADR-004)
 - cache_manager.c
   - Hot cache implementation, LRU eviction, preloading
 
 ### Playback Engine (Week 2)
 - led_driver.c
   - RMT peripheral control, double buffering, timing
+  - 320 LED support (ADR-003)
 - effect_engine.c
   - Pattern interpreter, parameter processing, transitions
 - animation_timer.c
@@ -105,16 +117,29 @@ Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, Web
 ## Configuration Constants
 
 ```c
-// Not 79 tokens - just what we need
-#define WS_BUFFER_SIZE      8192
+// CANON-Corrected Constants (ADRs 001-006)
+
+// ADR-002: WebSocket Configuration
+#define WS_BUFFER_SIZE      4096    // 4KB (98% success rate)
+#define WS_MAX_CLIENTS      2       // Heap safety
 #define WS_TIMEOUT_MS       5000
-#define PATTERN_CACHE_SIZE  5
-#define LED_FPS            60
-#define LED_COUNT          150
-#define WIFI_RETRY_MAX     10
-#define STORAGE_PATH       "/littlefs"
-#define PATTERN_VERSION    0x01
-#define MAX_PATTERN_SIZE   204800  // 200KB
+
+// ADR-003: LED Configuration
+#define LED_COUNT           320     // 320 WS2812B LEDs
+#define LED_FPS             60
+
+// ADR-004 + ADR-006: Pattern Configuration
+#define MAX_PATTERN_SIZE    262144  // 256KB maximum
+#define PATTERN_MIN_COUNT   15      // 15 minimum patterns
+#define PATTERN_CACHE_SIZE  5       // Hot cache count
+
+// ADR-005: Storage Configuration
+#define STORAGE_PATH        "/littlefs"
+#define STORAGE_SIZE        1572864  // 1.5MB (0x180000)
+
+// General Configuration
+#define WIFI_RETRY_MAX      10
+#define PATTERN_VERSION     0x01
 ```
 
 ## Message Protocol
@@ -147,34 +172,36 @@ IDLE -> RECEIVING -> VALIDATING -> STORING -> IDLE
 - Serial console shows boot messages
 - WiFi AP mode starts ("PRISM-SETUP")
 - Heap monitoring shows <50KB usage
-- WebSocket accepts connections
+- WebSocket accepts connections (4KB buffer, 2 clients max)
 - No heap fragmentation after 1000 connect/disconnect cycles
+- Memory pool manager operational (56KB reserved)
 
 ## Phase 2: Communication Protocol (Days 4-5)
 - Binary messages parse correctly
 - PUT_BEGIN/DATA/END sequence works
-- File writes to LittleFS successfully
+- File writes to LittleFS successfully at /littlefs
 - CRC validation catches corrupted data
 - Error codes return properly
-- 500KB/s sustained transfer rate
+- 500KB/s sustained transfer rate with 4KB buffer
 
 ## Phase 3: Storage System (Days 6-8)
-- LittleFS mounts and formats
+- LittleFS mounts at /littlefs (ADR-005)
+- Partition is 1.5MB at 0x311000 (ADR-001)
 - Patterns save/load/delete
 - Hot cache switches <100ms
 - Structural efficiency: 40% size reduction
-- 25+ patterns fit in partition
+- 15+ patterns fit in partition (ADR-006)
 - No filesystem corruption after power cycle
 
 ## Phase 4: Playback Engine (Days 9-10)
-- LED output at stable 60 FPS
+- LED output at stable 60 FPS for 320 LEDs (ADR-003)
 - Pattern switching without flicker
 - Parameter changes apply smoothly
 - Memory usage stable during playback
 - CPU usage <50% during animation
 
 ## Phase 5: Template System (Days 11-12)
-- 15 templates accessible
+- 15 templates accessible (ADR-006)
 - One-click deployment works
 - Metadata displays correctly
 - Categories organize properly
@@ -184,20 +211,20 @@ IDLE -> RECEIVING -> VALIDATING -> STORING -> IDLE
 
 ## Week 1: Foundation (Priority: CRITICAL)
 - TASK-01: Setup ESP-IDF v5.x project structure
-- TASK-02: Configure partition table (LittleFS 1.5MB)
-- TASK-03: Implement WebSocket server base
+- TASK-02: Configure partition table per ADR-001 (1.5MB littlefs at 0x311000)
+- TASK-03: Implement WebSocket server per ADR-002 (4KB buffer, 2 clients)
 - TASK-04: Create binary protocol parser
 - TASK-05: Add WiFi manager with AP mode
-- TASK-06: Implement heap monitoring
+- TASK-06: Implement heap monitoring and memory pools
 - TASK-07: Create error handling system
 - TASK-08: Add mDNS broadcasting
 
 ## Week 2: Storage & Playback (Priority: HIGH)
-- TASK-09: Initialize LittleFS filesystem
-- TASK-10: Implement .prism format parser
+- TASK-09: Initialize LittleFS at /littlefs per ADR-005
+- TASK-10: Implement .prism format parser (256KB max per ADR-004)
 - TASK-11: Create pattern storage API
 - TASK-12: Build hot cache system
-- TASK-13: Setup RMT LED driver
+- TASK-13: Setup RMT LED driver for 320 LEDs per ADR-003
 - TASK-14: Implement effect engine
 - TASK-15: Add animation timer
 - TASK-16: Create pattern transitions
@@ -206,15 +233,15 @@ IDLE -> RECEIVING -> VALIDATING -> STORING -> IDLE
 - TASK-17: Design 5 ambient templates
 - TASK-18: Design 5 energy templates
 - TASK-19: Design 5 special templates
-- TASK-20: Implement template loader
+- TASK-20: Implement template loader (15 templates per ADR-006)
 - TASK-21: Add template metadata
 - TASK-22: Create deployment system
 - TASK-23: Optimize memory usage
 - TASK-24: Add performance profiling
 
 ## Week 4: Testing & Optimization (Priority: MEDIUM)
-- TASK-25: Stress test WebSocket (24h run)
-- TASK-26: Test heap fragmentation
+- TASK-25: Stress test WebSocket (24h run, verify 4KB buffer stability)
+- TASK-26: Test heap fragmentation (verify memory pools work)
 - TASK-27: Validate pattern switching
 - TASK-28: Test WiFi reconnection
 - TASK-29: Profile power consumption
@@ -228,33 +255,36 @@ IDLE -> RECEIVING -> VALIDATING -> STORING -> IDLE
 firmware/
 ├── core/
 │   ├── esp_system_init.c
-│   ├── memory_manager.c
+│   ├── prism_memory_pool.c    # ADR: memory pool manager
+│   ├── prism_heap_monitor.c   # ADR: heap monitoring
+│   ├── prism_secure.c          # ADR: bounds checking
 │   └── error_handler.c
 ├── network/
-│   ├── websocket_handler.c
+│   ├── websocket_handler.c     # ADR-002: 4KB buffer, 2 clients
 │   ├── protocol_parser.c
 │   └── network_manager.c
 ├── storage/
-│   ├── pattern_storage.c
-│   ├── pattern_format.c
+│   ├── pattern_storage.c       # ADR-005: /littlefs paths
+│   ├── pattern_format.c        # ADR-004: 256KB max
 │   └── cache_manager.c
 ├── playback/
-│   ├── led_driver.c
+│   ├── led_driver.c            # ADR-003: 320 LEDs
 │   ├── effect_engine.c
 │   └── animation_timer.c
 └── templates/
-    ├── template_loader.c
+    ├── template_loader.c        # ADR-006: 15 templates
     └── template_patterns.c
 ```
 
 # Critical Path Dependencies
 
 1. ESP-IDF setup (TASK-01) blocks everything
-2. WebSocket (TASK-03) blocks protocol testing
-3. LittleFS (TASK-09) blocks storage features
-4. LED driver (TASK-13) blocks visual testing
-5. Hot cache (TASK-12) blocks performance targets
-6. Templates (TASK-17-19) block user experience
+2. Partition table (TASK-02 per ADR-001) blocks storage
+3. WebSocket (TASK-03 per ADR-002) blocks protocol testing
+4. LittleFS (TASK-09 per ADR-005) blocks storage features
+5. LED driver (TASK-13 per ADR-003) blocks visual testing
+6. Hot cache (TASK-12) blocks performance targets
+7. Templates (TASK-17-19, ADR-006) block user experience
 
 Parallel work possible:
 - Network team: TASK-03,04,05,08
@@ -264,16 +294,19 @@ Parallel work possible:
 # Risks and Mitigations
 
 - **Heap fragmentation kills device after hours**
-  - Mitigation: Fixed-size allocations, memory pools, monitoring
+  - Mitigation: Memory pool manager (TASK-06, already implemented)
+  - Fixed-size allocations: 8×4KB, 16×1KB, 32×256B
 
 - **WebSocket drops during large transfers**
-  - Mitigation: Chunked transfers, resume capability, CRC checks
+  - Mitigation: 4KB buffer per ADR-002 (98% success vs 85% with 8KB)
+  - Chunked transfers, resume capability, CRC checks
 
 - **Pattern switching causes visible glitch**
   - Mitigation: Double buffering, crossfade, preload next
 
-- **Templates too large for flash**
-  - Mitigation: Structural optimization, shared palettes
+- **Storage undersized for patterns**
+  - Mitigation: 1.5MB partition per ADR-001, 256KB max per ADR-004
+  - 15 patterns minimum per ADR-006 with expansion headroom
 
 - **WiFi reconnect storms router**
   - Mitigation: Exponential backoff, max retry limit
@@ -286,6 +319,7 @@ Parallel work possible:
 - Error paths tested
 - Serial debug output clear
 - Header documentation complete
+- CANON validation passes (validate-canon.sh)
 
 ## Per Feature
 - Functional requirement met
@@ -293,18 +327,28 @@ Parallel work possible:
 - Memory budget maintained
 - Error handling robust
 - Integration test passes
+- ADR specifications verified
 
 ## Overall Project
-- 15 templates working
+- 15 templates working (ADR-006)
 - <100ms pattern switch
-- 60 FPS LED output stable
+- 60 FPS LED output stable for 320 LEDs (ADR-003)
 - <150KB heap usage
-- Zero heap fragmentation (24h test)
-- WebSocket reliable
+- Zero heap fragmentation (24h test with memory pools)
+- WebSocket reliable (4KB buffer, 2 clients - ADR-002)
 - OTA update functional
-- 25+ patterns fit in storage
+- 15+ patterns fit in 1.5MB storage (ADR-001, ADR-006)
 
 # Appendix
+
+## CANON References
+All specifications derived from approved ADRs:
+- ADR-001: Partition Table (1.5MB littlefs at 0x311000)
+- ADR-002: WebSocket Buffer (4KB buffer, 2 clients)
+- ADR-003: LED Count (320 LEDs)
+- ADR-004: Pattern Max Size (256KB)
+- ADR-005: Storage Mount Path (/littlefs)
+- ADR-006: Pattern Count Revision (15 minimum)
 
 ## Reference Implementation
 - ESP-IDF Examples: protocols/websocket
@@ -313,7 +357,7 @@ Parallel work possible:
 
 ## Testing Hardware
 - ESP32-S3-DevKitC-1
-- WS2812B LED strip (150 pixels)
+- WS2812B LED strip (320 pixels - ADR-003)
 - USB power meter
 - WiFi 6 router for testing
 
@@ -321,5 +365,5 @@ Parallel work possible:
 - Time to first LED: <60 seconds
 - Pattern switch latency: <100ms
 - Template deployment: <2 seconds
-- Memory stability: 24 hours
-- WebSocket throughput: 500KB/s
+- Memory stability: 24 hours (with memory pools)
+- WebSocket throughput: 500KB/s (with 4KB buffer)

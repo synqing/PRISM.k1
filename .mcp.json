@@ -1,51 +1,95 @@
 {
   "mcpServers": {
-    "task-master-ai": {
+    "beads": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "task-master-ai"],
+      "command": "/Users/spectrasynq/.local/bin/beads-mcp",
       "env": {
-        "ANTHROPIC_API_KEY": "YOUR_ANTHROPIC_API_KEY_HERE",
-        "PERPLEXITY_API_KEY": "YOUR_PERPLEXITY_API_KEY_HERE",
-        "OPENAI_API_KEY": "YOUR_OPENAI_KEY_HERE",
-        "GOOGLE_API_KEY": "YOUR_GOOGLE_KEY_HERE",
-        "XAI_API_KEY": "YOUR_XAI_KEY_HERE",
-        "OPENROUTER_API_KEY": "YOUR_OPENROUTER_KEY_HERE",
-        "MISTRAL_API_KEY": "YOUR_MISTRAL_KEY_HERE",
-        "AZURE_OPENAI_API_KEY": "YOUR_AZURE_KEY_HERE",
-        "OLLAMA_API_KEY": "YOUR_OLLAMA_API_KEY_HERE"
+        "BEADS_PATH": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/.tools/bin/bd",
+        "BEADS_WORKING_DIR": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1",
+        "BEADS_DB": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/.beads/prism.db",
+        "BEADS_NO_AUTO_FLUSH": "false",
+        "BEADS_NO_AUTO_IMPORT": "false"
       }
     },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1"]
-    },
-    "context7": {
-      "command": "npx",
-      "args": ["-y", "@context7/mcp-server"]
-    },
-    "brave-search": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-      "env": {
-        "BRAVE_API_KEY": "BSAM7lIWYnjyJZnf6pMZ2-NY6yAfVjE"
-      }
-    },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-    },
-    "memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"]
-    },
-    "git": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-git"]
-    },
-    "sqlite": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sqlite"]
-    }
-  }
+		"task-master-ai": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"task-master-ai"
+			],
+			"env": {
+				"TASK_MASTER_TOOLS": "all",
+				"ANTHROPIC_API_KEY": "YOUR_ANTHROPIC_API_KEY_HERE",
+				"PERPLEXITY_API_KEY": "YOUR_PERPLEXITY_API_KEY_HERE",
+				"OPENAI_API_KEY": "YOUR_OPENAI_KEY_HERE",
+				"GOOGLE_API_KEY": "YOUR_GOOGLE_KEY_HERE",
+				"XAI_API_KEY": "YOUR_XAI_KEY_HERE",
+				"OPENROUTER_API_KEY": "YOUR_OPENROUTER_KEY_HERE",
+				"MISTRAL_API_KEY": "YOUR_MISTRAL_KEY_HERE",
+				"AZURE_OPENAI_API_KEY": "YOUR_AZURE_KEY_HERE",
+				"OLLAMA_API_KEY": "YOUR_OLLAMA_API_KEY_HERE"
+			}
+		},
+		"filesystem": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-filesystem",
+				"/Users/spectrasynq/Workspace_Management/Software/PRISM.k1"
+			]
+		},
+		"context7": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@context7/mcp-server"
+			]
+		},
+		"brave-search": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-brave-search"
+			],
+			"env": {
+				"BRAVE_API_KEY": "BSAM7lIWYnjyJZnf6pMZ2-NY6yAfVjE"
+			}
+		},
+		"sequential-thinking": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-sequential-thinking"
+			]
+		},
+		"memory": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-memory"
+			]
+		},
+		"git": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-git"
+			]
+		},
+		"sqlite": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-sqlite"
+			]
+		}
+	}
 }

@@ -1,0 +1,50 @@
+#!/bin/bash
+# Message Bus - Inter-agent communication
+
+post_message() {
+    local FROM=$1
+    local TO=$2
+    local TYPE=$3
+    local MESSAGE=$4
+    
+    mkdir -p .multi-agent/.messages
+    local MSG_FILE=".multi-agent/.messages/$(date +%s)-${FROM}-${TO}.json"
+    
+    cat > "$MSG_FILE" <<MSG
+{
+    "from": "$FROM",
+    "to": "$TO",
+    "type": "$TYPE",
+    "message": "$MESSAGE",
+    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "read": false
+}
+MSG
+    
+    echo "✉️  Message sent: $FROM → $TO"
+}
+
+check_messages() {
+    local AGENT_ID=$1
+    
+    find .multi-agent/.messages -name "*-${AGENT_ID}.json" -o -name "*-all.json" 2>/dev/null | \
+        while read MSG; do
+            if [ -f "$MSG" ] && command -v jq >/dev/null 2>&1; then
+                if [ "$(jq -r .read "$MSG" 2>/dev/null)" = "false" ]; then
+                    echo "📬 New message:"
+                    jq . "$MSG"
+                    
+                    # Mark as read
+                    local TMP=$(mktemp)
+                    jq '.read = true' "$MSG" > "$TMP" && mv "$TMP" "$MSG"
+                fi
+            fi
+        done
+}
+
+# CLI
+case "$1" in
+    post) post_message "$2" "$3" "$4" "$5" ;;
+    check) check_messages "$2" ;;
+    *) echo "Usage: message-bus.sh post|check <args>" ;;
+esac

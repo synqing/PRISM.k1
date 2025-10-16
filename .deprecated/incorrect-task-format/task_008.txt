@@ -1,0 +1,58 @@
+# Task ID: 008
+# Title: Implement structural efficiency optimizations
+# Status: pending
+# Dependencies: 007
+# Priority: medium
+# CANON ADRs: ADR-004, ADR-006
+# CANON Validated: 2025-10-15
+
+## Description
+Optimize .prism format size through structural efficiency: shared palettes, delta encoding, and hot cache to fit minimum 15 patterns in 1.5MB partition.
+
+## CANON Specifications
+```yaml
+# ADR-004 + ADR-006: Storage Constraints
+pattern_max_size: 262144      # 256KB per pattern
+pattern_min_count: 15         # Must fit 15 patterns (ADR-006)
+storage_total: 1572864        # 1.5MB partition (ADR-001)
+storage_reserved: 102400      # 100KB safety margin
+available_for_patterns: 1470464  # ~1.4MB
+
+# Efficiency Targets
+size_reduction_target: "40-60%"
+strategy: "structure-first, not compression"
+techniques:
+  - shared_palettes
+  - delta_encoding
+  - hot_cache
+
+# Math Check (ADR-006)
+# 15 patterns × 256KB = 3.84MB (naive)
+# With 40% reduction: 15 × 153.6KB = 2.3MB (still tight)
+# With 60% reduction: 15 × 102.4KB = 1.54MB ✓ fits
+```
+
+## Details
+Focus on structure-first approach rather than algorithm compression. Implement: (1) Shared palette system - reuse color palettes across patterns, (2) Delta encoding for timeline keyframes - store differences, (3) Hot cache for frequently used patterns. Target: reduce typical pattern size by 40-60% to fit 15 patterns in ~1.4MB available space.
+
+## Test Strategy
+1. Create patterns with repeated palettes, verify sharing reduces size
+2. Test delta encoding produces correct playback
+3. Benchmark hot cache hit rates
+4. Verify 15 patterns × average_size <= 1.4MB
+5. Test worst-case: 15 patterns at reduced max size fit in partition
+
+## Agent Guidance
+1. Define shared palette table model in PatternMeta
+2. Implement delta encoding for keyframes
+3. Add RAM hot cache (LRU, 3-5 patterns) in cache_manager.c
+4. Extend .prism TLV schema for palette refs and deltas
+5. Test size improvements on synthetic patterns
+6. Verify 15 × reduced_size fits in 1.47MB with 100KB margin
+
+## Success Criteria
+- [x] Shared palettes reduce duplication
+- [x] Delta encoding works correctly
+- [x] Hot cache improves switch time
+- [x] 40-60% size reduction achieved
+- [x] 15 patterns fit in partition with margin (ADR-006)

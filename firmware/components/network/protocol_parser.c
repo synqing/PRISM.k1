@@ -16,7 +16,9 @@
 
 #include "protocol_parser.h"
 #include "pattern_storage.h"
+#include "pattern_metadata.h"  // Motion/sync enums and validators (Task 13.2)
 #include "led_driver.h"
+#include "led_playback.h"
 #include "esp_log.h"
 #include "esp_rom_crc.h"
 #include "freertos/FreeRTOS.h"
@@ -25,6 +27,20 @@
 #include <stdlib.h>
 
 static const char* TAG = "protocol";
+
+/* Additional TLV value types for motion/sync within higher-level payloads */
+#define PRISM_TLV_MOTION  0x20
+#define PRISM_TLV_SYNC    0x21
+
+static bool validate_motion_tlv(uint8_t motion_value)
+{
+    return PRISM_MOTION_IS_VALID(motion_value);
+}
+
+static bool validate_sync_tlv(uint8_t sync_value)
+{
+    return PRISM_SYNC_IS_VALID(sync_value);
+}
 
 /* ============================================================================
  * Module State
@@ -596,30 +612,32 @@ static esp_err_t handle_control(const tlv_frame_t* frame, int client_fd)
 
             ESP_LOGI(TAG, "CONTROL PLAY: pattern='%s'", pattern_name);
 
-            // Phase 4 Implementation: Basic LED driver integration
-            // For now, start LED driver if not running
-            // Full pattern playback engine will be implemented in later phases
-            esp_err_t ret = led_driver_start();
-            if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-                ESP_LOGE(TAG, "CONTROL PLAY: LED driver start failed (%s)", esp_err_to_name(ret));
+            // Integrate with playback engine (built-in effects for now)
+            // Until .prism parser is implemented, map any name to a default built-in effect
+            // EFFECT_PALETTE_CYCLE (0x0040) provides a visible animation
+            extern esp_err_t playback_play_builtin(uint16_t effect_id, const uint8_t* params, uint8_t param_count);
+            esp_err_t ret = playback_play_builtin(0x0040 /* EFFECT_PALETTE_CYCLE */, NULL, 0);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "CONTROL PLAY: playback start failed (%s)", esp_err_to_name(ret));
                 return ret;
             }
 
-            ESP_LOGI(TAG, "CONTROL PLAY: LED driver started (pattern playback engine pending)");
+            ESP_LOGI(TAG, "CONTROL PLAY: playback engine started (effect palette cycle)");
             return ESP_OK;
         }
 
         case CONTROL_CMD_STOP: {
             ESP_LOGI(TAG, "CONTROL STOP: stopping playback");
 
-            // Stop LED driver
-            esp_err_t ret = led_driver_stop();
+            // Stop playback (keep driver active)
+            extern esp_err_t playback_stop(void);
+            esp_err_t ret = playback_stop();
             if (ret != ESP_OK) {
-                ESP_LOGE(TAG, "CONTROL STOP: LED driver stop failed (%s)", esp_err_to_name(ret));
+                ESP_LOGE(TAG, "CONTROL STOP: playback_stop failed (%s)", esp_err_to_name(ret));
                 return ret;
             }
 
-            ESP_LOGI(TAG, "CONTROL STOP: playback stopped");
+            ESP_LOGI(TAG, "CONTROL STOP: playback stopped (driver remains running)");
             return ESP_OK;
         }
 

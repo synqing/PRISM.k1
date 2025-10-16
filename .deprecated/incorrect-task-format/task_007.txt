@@ -1,0 +1,55 @@
+# Task ID: 007
+# Title: Implement binary file format parser for .prism files
+# Status: pending
+# Dependencies: 005, 006
+# Priority: high
+# CANON ADRs: ADR-004
+# CANON Validated: 2025-10-15
+
+## Description
+Create .prism file header validation and TLV record parser with bounds checking for pattern files up to 256KB.
+
+## CANON Specifications
+```yaml
+# ADR-004: Pattern Format Constraints
+pattern_max_size: 262144     # 256KB maximum file size
+header_magic: "PRISM\x00\x00\x00"
+header_size: 32              # Fixed header size
+tlv_records:
+  - 0x0001: metadata
+  - 0x0002: timeline
+  - 0x0003: palette
+  - 0x0004: effects
+  - 0x0005: parameters
+bounds_checking: mandatory
+crc32_validation: required
+```
+
+## Details
+Validate .prism format magic bytes 'PRISM\x00\x00\x00', version check, CRC32 header verification. Implement safe TLV parser with: bounds checking, maximum length validation (256KB per ADR-004), safe memory allocation. Support record types 0x0001-0x0005. Reject files larger than 262144 bytes.
+
+## Test Strategy
+1. Test with malformed headers - reject gracefully
+2. Test oversized TLV records - reject safely
+3. Test corrupted CRC32 - detect and reject
+4. Test files >256KB - reject per ADR-004
+5. Verify parser doesn't crash on any input
+6. Test with valid pattern files
+
+## Agent Guidance
+1. Create firmware/components/storage/include/prism_format.h
+2. Define header struct (magic, version, size, crc32)
+3. Define TLV constants (0x0001-0x0005)
+4. Implement bounds checking: size <= 262144
+5. Implement CRC32 validation using prism_hash
+6. Add safe TLV iterator with overflow checks
+7. Parse TLVs into PatternMeta struct
+8. Add fuzz tests for malformed inputs
+
+## Success Criteria
+- [x] Parser validates magic bytes correctly
+- [x] Files >256KB rejected (ADR-004)
+- [x] CRC32 validation catches corruption
+- [x] TLV bounds checking prevents overflows
+- [x] No crashes on malformed inputs
+- [x] Valid pattern files parse correctly

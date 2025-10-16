@@ -2,11 +2,12 @@
 
 dependencies:
   # Core ESP-IDF components (included by default)
-  espressif/esp-littlefs: "^1.10.2"
+  espressif/esp-littlefs: ^1.10.2
 
   # Optional: Add more third-party components as needed
   # espressif/led_strip: "^2.5.0"
   # espressif/json: "^1.0.0"
 
-description: "PRISM K1 LED Controller Firmware"
-version: "1.0.0"
+  espressif/mdns: ^1.2.5
+description: PRISM K1 LED Controller Firmware
+version: 1.0.0

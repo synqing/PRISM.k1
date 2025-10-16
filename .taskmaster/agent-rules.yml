@@ -1,0 +1,851 @@
+# PRISM K1 Agent Rules Configuration
+# Version: 1.0.0
+# Last Updated: 2025-10-15
+# Status: ACTIVE
+#
+# Machine-readable rules for agent behavior in the Knowledge Fortress system.
+# These rules are MANDATORY and enforced by validation systems.
+#
+# Related Documentation:
+# - METHODOLOGY.md - Complete research-first process
+# - ADR_GUIDE.md - Architecture Decision Record writing guide
+# - VALIDATION_GUIDE.md - Validation procedures and checklists
+
+---
+version: "1.0.0"
+system: "PRISM K1 Knowledge Fortress"
+enforced: true
+
+# =============================================================================
+# CORE PRINCIPLES
+# =============================================================================
+
+core_principles:
+  research_first:
+    rule: "Never make technical decisions without validated research"
+    enforcement: "BLOCKING"
+    process:
+      - "Question identified"
+      - "Research conducted with documented methodology"
+      - "Research reviewed by Captain"
+      - "Research moved to [VALIDATED] if approved"
+      - "ADR created from validated research"
+      - "Decision implemented"
+    violations:
+      - "Opinion-based decisions without evidence"
+      - "Implementing without ADR"
+      - "Using unvalidated research"
+
+  single_source_of_truth:
+    rule: "CANON.md is THE authoritative specification. Code MUST match CANON."
+    enforcement: "BLOCKING"
+    authority: "CANON.md (auto-generated from ADRs)"
+    process:
+      - "ADRs created and approved"
+      - "CANON.md auto-generated from ADRs"
+      - "Code synchronized to CANON"
+      - "Validation enforced via CI/CD"
+    violations:
+      - "Manual CANON.md edits"
+      - "Code not matching CANON"
+      - "Implementing from outdated specifications"
+
+  immutable_records:
+    rule: "Approved ADRs cannot be edited. Create new ADR to supersede."
+    enforcement: "BLOCKING"
+    process:
+      - "ADR drafted (status: PROPOSED)"
+      - "ADR reviewed by Captain"
+      - "ADR approved (status: APPROVED)"
+      - "ADR becomes immutable"
+      - "Changes require new ADR with 'supersedes' field"
+    violations:
+      - "Editing approved ADR"
+      - "Changing ADR status back from APPROVED"
+      - "Deleting approved ADR"
+
+  captain_review:
+    rule: "All research and ADRs must pass Captain review before approval"
+    enforcement: "BLOCKING"
+    reviewer:
+      name: "Captain SpectraSynq"
+      role: "Project Owner"
+      authority: "Final approval on all decisions"
+      responsibilities:
+        - "Review methodology for reproducibility"
+        - "Challenge assumptions and conclusions"
+        - "Check for conflicts with existing research"
+        - "Provide APPROVE / NEEDS_REVISION / REJECT decision"
+    timeline:
+      simple_research: "24 hours"
+      complex_research: "48 hours"
+      adr_review: "24 hours"
+      emergency: "4 hours"
+    violations:
+      - "Implementing without Captain approval"
+      - "Bypassing review process"
+      - "Self-approving research or ADRs"
+
+  evidence_based:
+    rule: "Every decision must cite evidence (measurement, citation, or validated research)"
+    enforcement: "BLOCKING"
+    accepted_evidence:
+      MEASUREMENT:
+        description: "Direct hardware measurement"
+        requirements:
+          - "Methodology documented"
+          - "Raw data provided"
+          - "Reproducible procedure"
+          - "Tools and versions specified"
+      VALIDATED:
+        description: "Peer-reviewed research document"
+        requirements:
+          - "Located in research/[VALIDATED]/"
+          - "Captain approved"
+          - "Methodology reproducible"
+          - "Data complete"
+      CITATION:
+        description: "External authoritative source"
+        requirements:
+          - "Official documentation (ESP-IDF, datasheets)"
+          - "Verifiable and accessible"
+          - "Version specified"
+          - "Relevant to decision"
+      PRODUCTION:
+        description: "Production data from deployed devices"
+        requirements:
+          - "Real deployment data"
+          - "Sample size documented"
+          - "Time period specified"
+          - "Conditions described"
+    rejected:
+      - "Opinions without data"
+      - "Best practices without source"
+      - "Assumptions without validation"
+      - "Anecdotal evidence"
+      - "Unverified claims"
+    violations:
+      - "ADR without evidence section"
+      - "Research without data"
+      - "Decision based on opinion"
+
+# =============================================================================
+# RESEARCH LIFECYCLE
+# =============================================================================
+
+research_lifecycle:
+  states:
+    PROPOSED:
+      description: "Research created, awaiting review"
+      location: ".taskmaster/research/[PROPOSED]/"
+      allowed_actions:
+        - "Submit for Captain review"
+        - "Edit and revise"
+        - "Withdraw"
+      required_fields:
+        - "title"
+        - "status: PROPOSED"
+        - "author"
+        - "date"
+        - "category"
+        - "question"
+        - "methodology"
+        - "impact"
+
+    IN_REVIEW:
+      description: "Captain review in progress"
+      location: ".taskmaster/research/[PROPOSED]/"
+      allowed_actions:
+        - "Captain reviews"
+        - "Captain requests revisions"
+        - "Captain approves"
+        - "Captain rejects"
+      restrictions:
+        - "No author edits during review"
+        - "Wait for Captain decision"
+
+    VALIDATED:
+      description: "Captain approved, can be cited in ADRs"
+      location: ".taskmaster/research/[VALIDATED]/"
+      allowed_actions:
+        - "Reference in ADRs"
+        - "Use as evidence"
+        - "Archive if superseded"
+      restrictions:
+        - "No further edits (immutable)"
+        - "Can only be superseded by new research"
+      required_metadata:
+        - "validated_by: Captain SpectraSynq"
+        - "validated_date: YYYY-MM-DD"
+
+    REJECTED:
+      description: "Captain rejected, archived with rationale"
+      location: ".taskmaster/research/[REJECTED]/"
+      allowed_actions:
+        - "Review rejection reasons"
+        - "Learn from mistakes"
+        - "Start new research addressing issues"
+      restrictions:
+        - "Cannot be cited as evidence"
+        - "Cannot be moved back to PROPOSED"
+      required_metadata:
+        - "rejected_by: Captain SpectraSynq"
+        - "rejected_date: YYYY-MM-DD"
+        - "rejection_reason: [detailed rationale]"
+
+  transitions:
+    PROPOSED_to_IN_REVIEW:
+      trigger: "Agent submits for Captain review"
+      requirements:
+        - "Document follows template"
+        - "Methodology section complete"
+        - "Question clearly stated"
+        - "Self-validation checklist passed"
+
+    IN_REVIEW_to_VALIDATED:
+      trigger: "Captain approves"
+      requirements:
+        - "Methodology reproducible"
+        - "Assumptions stated"
+        - "Limitations acknowledged"
+        - "No conflicts with existing research"
+        - "Captain approval documented"
+
+    IN_REVIEW_to_REJECTED:
+      trigger: "Captain rejects"
+      requirements:
+        - "Rejection reasons documented"
+        - "Author notified"
+        - "Captain feedback documented"
+
+    VALIDATED_to_ADR:
+      trigger: "Decision needed based on research"
+      process:
+        - "Run ./scripts/create-adr.sh"
+        - "Select validated research as source"
+        - "Complete ADR template"
+        - "Get Captain approval"
+        - "Update status to APPROVED"
+        - "Run ./scripts/generate-canon.sh"
+
+# =============================================================================
+# ADR LIFECYCLE
+# =============================================================================
+
+adr_lifecycle:
+  states:
+    PROPOSED:
+      description: "ADR drafted, awaiting Captain approval"
+      location: ".taskmaster/decisions/"
+      allowed_actions:
+        - "Edit and revise"
+        - "Submit for Captain review"
+        - "Withdraw"
+      required_sections:
+        - "Context"
+        - "Research Evidence"
+        - "Decision"
+        - "Alternatives Considered"
+        - "Consequences"
+        - "Validation Criteria"
+        - "Implementation"
+        - "References"
+        - "Metadata"
+
+    APPROVED:
+      description: "Captain approved, immutable, part of CANON"
+      location: ".taskmaster/decisions/"
+      allowed_actions:
+        - "Include in CANON generation"
+        - "Reference in other ADRs"
+        - "Implement in code"
+        - "Supersede with new ADR"
+      restrictions:
+        - "Cannot edit (immutable)"
+        - "Cannot delete"
+        - "Cannot change status"
+      required_metadata:
+        - "approved_by: Captain SpectraSynq"
+        - "approved_date: YYYY-MM-DD"
+
+    REJECTED:
+      description: "Captain rejected, archived"
+      location: ".taskmaster/decisions/archive/"
+      allowed_actions:
+        - "Review rejection reasons"
+        - "Create new ADR addressing issues"
+      restrictions:
+        - "Not part of CANON"
+        - "Cannot be implemented"
+
+    SUPERSEDED:
+      description: "Replaced by newer ADR"
+      location: ".taskmaster/decisions/"
+      allowed_actions:
+        - "View historical context"
+        - "Trace decision evolution"
+      required_metadata:
+        - "superseded_by: ADR-XXX"
+        - "superseded_date: YYYY-MM-DD"
+      restrictions:
+        - "Not used for new implementations"
+        - "Kept for audit trail"
+
+  required_sections:
+    context:
+      purpose: "Explain WHY decision is needed"
+      requirements:
+        - "Describes problem or question"
+        - "Outlines constraints and requirements"
+        - "Provides background"
+        - "Clear and concise"
+
+    research_evidence:
+      purpose: "Cite evidence supporting decision"
+      requirements:
+        - "Cites validated research OR measurements OR authoritative sources"
+        - "No unsupported opinions"
+        - "No 'best practices' without source"
+        - "Evidence directly relevant"
+      accepted_formats:
+        - "[VALIDATED] research-XXX"
+        - "[MEASUREMENT] with methodology"
+        - "[CITATION] ESP-IDF docs, datasheets"
+        - "[PRODUCTION] deployment data"
+
+    decision:
+      purpose: "State the decision clearly and unambiguously"
+      requirements:
+        - "Clear, unambiguous statement"
+        - "Machine-readable YAML if introducing constants"
+        - "Rationale explains WHY"
+        - "Actionable and implementable"
+      example: |
+        Set WebSocket frame buffer to 4096 bytes (4KB).
+
+        ```yaml
+        ws_buffer_size: 4096
+        ws_max_clients: 2
+        ```
+
+    alternatives_considered:
+      purpose: "Show genuine consideration of options"
+      requirements:
+        - "At least 2 alternatives documented"
+        - "Pros and cons for each"
+        - "Explains why rejected"
+        - "Not strawman arguments"
+
+    consequences:
+      purpose: "Document trade-offs and implications"
+      requirements:
+        - "Positive consequences"
+        - "Negative consequences (honest)"
+        - "Neutral/informational items"
+        - "Long-term implications"
+        - "Realistic assessment"
+
+    validation_criteria:
+      purpose: "Define success and failure conditions"
+      requirements:
+        - "Measurable success criteria"
+        - "Failure conditions identified"
+        - "Testing approach outlined"
+        - "Monitoring requirements"
+
+    implementation:
+      purpose: "Provide actionable implementation details"
+      requirements:
+        - "Affected components listed"
+        - "Configuration changes specified"
+        - "Code changes outlined"
+        - "Migration steps if applicable"
+
+    references:
+      purpose: "Link to supporting materials"
+      requirements:
+        - "All research sources linked"
+        - "External citations complete"
+        - "Related ADRs referenced"
+        - "No broken links"
+
+    metadata:
+      purpose: "Track ADR relationships and history"
+      required_fields:
+        - "supersedes: [ADR-XXX or null]"
+        - "superseded_by: [ADR-XXX or null]"
+        - "dependencies: [list of ADR numbers]"
+        - "tags: [relevant keywords]"
+
+# =============================================================================
+# CANON GENERATION
+# =============================================================================
+
+canon:
+  source_of_truth: true
+  location: ".taskmaster/CANON.md"
+  generation:
+    method: "Automated from approved ADRs"
+    script: "./scripts/generate-canon.sh"
+    triggers:
+      - "After ADR approval"
+      - "Before code synchronization"
+      - "On demand for validation"
+    process:
+      - "Scan .taskmaster/decisions/ for status: APPROVED"
+      - "Extract decision sections"
+      - "Generate table of contents"
+      - "Include machine-readable YAML"
+      - "Add change history"
+      - "Add document signature"
+
+  enforcement:
+    pre_commit_hook:
+      location: ".githooks/pre-commit"
+      blocks:
+        - "Manual CANON.md edits (no [AUTO] marker)"
+        - "ADR format violations"
+      allows:
+        - "CANON.md changes with [AUTO] marker"
+        - "Auto-generated updates"
+
+    pre_push_hook:
+      location: ".githooks/pre-push"
+      runs: "./scripts/validate-canon.sh"
+      blocks:
+        - "Code not matching CANON"
+        - "Specification drift"
+      validates:
+        - "Constants match"
+        - "Configuration matches"
+        - "Partition table matches"
+
+    ci_cd:
+      location: ".github/workflows/canon-validation.yml"
+      triggers:
+        - "Every push to main/develop"
+        - "Every pull request"
+      validates:
+        - "CANON freshness (matches ADRs)"
+        - "No manual CANON edits"
+        - "Code constants match CANON"
+        - "ADR format compliance"
+      result:
+        - "Firmware builds only if validation passes"
+        - "PR blocked if validation fails"
+
+  structure:
+    required_sections:
+      - "Table of Contents"
+      - "Decision Specifications (from ADRs)"
+      - "Machine-Readable Configuration (YAML)"
+      - "Change History"
+      - "Document Signature"
+    format: "Markdown with embedded YAML"
+    signature: "SHA-256 hash of approved ADRs"
+
+# =============================================================================
+# CODE SYNCHRONIZATION
+# =============================================================================
+
+code_sync:
+  principle: "Code MUST match CANON at all times"
+  script: "./scripts/sync-code-to-canon.sh"
+  generates:
+    - file: "firmware/components/core/include/prism_config.h"
+      content: "C header with #define constants from CANON YAML"
+      format: |
+        #define CONSTANT_NAME value  /**< Description (ADR-XXX) */
+
+  validation:
+    script: "./scripts/validate-canon.sh"
+    steps:
+      step1:
+        name: "CANON freshness check"
+        validates: "CANON matches approved ADRs"
+      step2:
+        name: "Constants validation"
+        validates: "prism_config.h matches CANON YAML"
+      step3:
+        name: "sdkconfig validation"
+        validates: "sdkconfig.defaults matches CANON"
+      step4:
+        name: "Partition table validation"
+        validates: "partitions.csv matches CANON"
+      step5:
+        name: "Header generation"
+        validates: "Headers up-to-date with CANON"
+
+  violations:
+    - type: "Constant mismatch"
+      severity: "BLOCKING"
+      example: "Code has 8192, CANON specifies 4096"
+      fix: "Update code to match CANON OR create new ADR"
+
+    - type: "Missing ADR reference"
+      severity: "WARNING"
+      example: "#define without /** (ADR-XXX) */ comment"
+      fix: "Add ADR reference to code comment"
+
+    - type: "Configuration drift"
+      severity: "BLOCKING"
+      example: "sdkconfig doesn't match CANON specification"
+      fix: "Update sdkconfig.defaults to match CANON"
+
+    - type: "Partition table mismatch"
+      severity: "BLOCKING"
+      example: "Size/offset doesn't match CANON"
+      fix: "Update partitions.csv to match CANON exactly"
+
+# =============================================================================
+# CONFLICT RESOLUTION
+# =============================================================================
+
+conflict_resolution:
+  specification_conflicts:
+    trigger: "Two specifications say different things"
+    process:
+      - "STOP immediately - do not implement conflicting spec"
+      - "Document conflict with sources and line numbers"
+      - "Research both positions"
+      - "Conduct validation research if needed"
+      - "Create conflict resolution ADR"
+      - "Update CANON from ADR"
+      - "CANON becomes new truth"
+
+    priority_order:
+      1: "CANON.md (highest authority)"
+      2: "Approved ADRs (source of CANON)"
+      3: "Validated research (evidence base)"
+      4: "PRD (original requirements, may be outdated)"
+      5: "Code comments (may be stale)"
+
+    resolution_adr:
+      required_sections:
+        - "Context: Document the conflict"
+        - "Evidence: Present research findings"
+        - "Decision: Choose ONE specification"
+        - "Rationale: WHY this spec was chosen"
+        - "Supersedes: Mark conflicting specs"
+
+  research_conflicts:
+    scenarios:
+      different_contexts:
+        description: "Both valid in different contexts"
+        resolution: "Create ADR noting context-dependent nature"
+        example: "4KB for reliability, 8KB for max throughput"
+
+      methodology_improved:
+        description: "Newer research supersedes older"
+        resolution: "Move older to [ARCHIVED], add superseded_by metadata"
+
+      genuine_conflict:
+        description: "Need new research to resolve"
+        resolution: "Design experiment, execute, create ADR from result"
+
+# =============================================================================
+# QUALITY STANDARDS
+# =============================================================================
+
+quality_standards:
+  research:
+    mandatory_criteria:
+      methodology:
+        - "Question clearly stated"
+        - "Methodology reproducible"
+        - "Tools/equipment listed"
+        - "Test duration specified"
+        - "Sample size documented"
+        - "Variables controlled"
+        - "Assumptions stated explicitly"
+      data:
+        - "Raw data provided"
+        - "Measurements timestamped"
+        - "Units specified"
+        - "Uncertainties acknowledged"
+        - "Outliers explained"
+      analysis:
+        - "Calculations shown"
+        - "Statistical methods appropriate"
+        - "Conclusions supported by data"
+        - "Alternative explanations considered"
+        - "Limitations acknowledged"
+      documentation:
+        - "Executive summary (1-2 paragraphs)"
+        - "Methodology section complete"
+        - "Data section with tables/graphs"
+        - "Analysis section with interpretation"
+        - "Conclusions section"
+        - "Limitations section"
+        - "Recommendations section"
+
+    scoring:
+      excellent: "9-10/10 - Publication quality"
+      good: "7-8/10 - Minor revisions needed"
+      acceptable: "5-6/10 - Needs revision"
+      insufficient: "<5/10 - Major rework required"
+
+  adr:
+    mandatory_criteria:
+      structure:
+        - "All 9 template sections present"
+        - "Context explains why decision needed"
+        - "Decision is clear and unambiguous"
+        - "At least 2 alternatives considered"
+        - "Pros/cons listed for each alternative"
+        - "Consequences documented (positive/negative/neutral)"
+        - "Validation criteria defined"
+        - "Implementation details provided"
+      evidence:
+        - "Cites validated research OR measurements OR authoritative sources"
+        - "NO opinions without evidence"
+        - "NO 'best practices' without source"
+      traceability:
+        - "Research sources linked"
+        - "Supersedes/Superseded By specified"
+        - "Audit trail complete"
+        - "Date and author documented"
+
+    scoring:
+      excellent: "9-10/10 - Zero ambiguity"
+      good: "7-8/10 - Minor clarifications needed"
+      acceptable: "5-6/10 - Needs revision"
+      insufficient: "<5/10 - Major rework required"
+
+  code:
+    mandatory_criteria:
+      - "All constants match CANON exactly"
+      - "All configurations match specifications"
+      - "Partition table exact match"
+      - "Headers generated correctly"
+      - "No validation errors"
+      - "Full traceability (ADR comments)"
+
+    scoring:
+      perfect: "100% - Full compliance"
+      good: "90-99% - Minor mismatches"
+      acceptable: "70-89% - Several issues"
+      non_compliant: "<70% - Major drift"
+
+# =============================================================================
+# TOOLS & AUTOMATION
+# =============================================================================
+
+tools:
+  scripts:
+    generate_canon:
+      path: ".taskmaster/scripts/generate-canon.sh"
+      purpose: "Auto-generate CANON.md from approved ADRs"
+      usage: "./scripts/generate-canon.sh"
+      when:
+        - "After ADR approval"
+        - "Before code synchronization"
+        - "Manual validation"
+
+    create_adr:
+      path: ".taskmaster/scripts/create-adr.sh"
+      purpose: "Interactive ADR creation wizard"
+      usage: "./scripts/create-adr.sh"
+      features:
+        - "Auto-numbers ADRs"
+        - "Lists validated research for citation"
+        - "Pre-populates template"
+
+    validate_canon:
+      path: ".taskmaster/scripts/validate-canon.sh"
+      purpose: "Validate code matches CANON"
+      usage: "./scripts/validate-canon.sh"
+      steps:
+        - "Freshness check"
+        - "Constants validation"
+        - "Config validation"
+        - "Partition validation"
+        - "Header validation"
+
+    sync_code:
+      path: ".taskmaster/scripts/sync-code-to-canon.sh"
+      purpose: "Generate code from CANON"
+      usage: "./scripts/sync-code-to-canon.sh"
+      generates:
+        - "prism_config.h"
+        - "Updates sdkconfig.defaults if needed"
+
+    extract_constants:
+      path: ".taskmaster/scripts/extract-constants.sh"
+      purpose: "Extract constants as JSON"
+      usage: "./scripts/extract-constants.sh"
+      output: "JSON with all CANON constants"
+
+  git_hooks:
+    pre_commit:
+      path: ".githooks/pre-commit"
+      enforces:
+        - "No manual CANON.md edits"
+        - "Requires [AUTO] marker if CANON changes"
+        - "ADR format validation"
+
+    pre_push:
+      path: ".githooks/pre-push"
+      enforces:
+        - "Full CANON validation"
+        - "Code must match CANON"
+        - "Can bypass with --no-verify (NOT recommended)"
+
+  ci_cd:
+    canon_validation:
+      path: ".github/workflows/canon-validation.yml"
+      triggers:
+        - "Every push to main/develop"
+        - "Every pull request"
+      validates:
+        - "CANON freshness"
+        - "No manual edits"
+        - "Code compliance"
+        - "ADR format"
+      result:
+        - "Firmware builds only if validation passes"
+
+# =============================================================================
+# BEST PRACTICES
+# =============================================================================
+
+best_practices:
+  do:
+    - name: "Always cite sources"
+      rationale: "Every claim needs evidence"
+    - name: "Document methodology"
+      rationale: "Make research reproducible"
+    - name: "Seek Captain review"
+      rationale: "Maintain quality and coherence"
+    - name: "Update CANON after ADR"
+      rationale: "Keep single source of truth current"
+    - name: "Validate before push"
+      rationale: "Use pre-push hook"
+    - name: "Ask when uncertain"
+      rationale: "Escalate to Captain if unclear"
+
+  dont:
+    - name: "Never edit CANON manually"
+      rationale: "Always regenerate from ADRs"
+      enforcement: "BLOCKING (pre-commit hook)"
+    - name: "Never skip Captain review"
+      rationale: "Quality depends on validation"
+      enforcement: "BLOCKING (process requirement)"
+    - name: "Never implement conflicting specs"
+      rationale: "Resolve conflicts first"
+      enforcement: "BLOCKING (process requirement)"
+    - name: "Never make decisions without evidence"
+      rationale: "Research first"
+      enforcement: "BLOCKING (validation requirement)"
+    - name: "Never bypass validation"
+      rationale: "Hooks exist for a reason"
+      enforcement: "BLOCKING (git hooks)"
+    - name: "Never assume specifications"
+      rationale: "Check CANON"
+      enforcement: "WARNING (code review)"
+
+# =============================================================================
+# SUCCESS METRICS
+# =============================================================================
+
+success_metrics:
+  zero_ambiguity:
+    measure: "Any question has ONE clear answer in CANON"
+    target: "100%"
+    validation: "Manual audit quarterly"
+
+  zero_drift:
+    measure: "Code always matches CANON"
+    target: "100% compliance"
+    validation: "Automated (CI/CD, hooks)"
+
+  zero_conflicts:
+    measure: "No competing specifications"
+    target: "Zero conflicts"
+    validation: "Conflict resolution ADRs"
+
+  full_traceability:
+    measure: "Every constant traces to specific ADR"
+    target: "100%"
+    validation: "validate-canon.sh checks"
+
+  immutable_history:
+    measure: "Every decision timestamped and auditable"
+    target: "100%"
+    validation: "Git history + ADR metadata"
+
+# =============================================================================
+# AGENT BEHAVIOR
+# =============================================================================
+
+agent_behavior:
+  when_starting_task:
+    - "Read relevant documentation (METHODOLOGY.md, ADR_GUIDE.md, VALIDATION_GUIDE.md)"
+    - "Check CANON.md for current specifications"
+    - "Review related ADRs for context"
+    - "Identify dependencies and constraints"
+
+  when_researching:
+    - "Follow research template exactly"
+    - "Document methodology for reproducibility"
+    - "Collect complete data, not just summaries"
+    - "State assumptions explicitly"
+    - "Acknowledge limitations honestly"
+    - "Submit to Captain for review"
+    - "Wait for approval before citing"
+
+  when_creating_adr:
+    - "Use ./scripts/create-adr.sh"
+    - "Complete all 9 required sections"
+    - "Cite validated evidence only"
+    - "Consider at least 2 genuine alternatives"
+    - "Be honest about consequences"
+    - "Provide detailed implementation steps"
+    - "Submit to Captain for approval"
+    - "Wait for APPROVED status before implementing"
+
+  when_implementing:
+    - "Read CANON.md for specifications"
+    - "Use generated prism_config.h for constants"
+    - "Add ADR references in code comments"
+    - "Run ./scripts/validate-canon.sh before commit"
+    - "Fix any validation failures"
+    - "Test implementation"
+    - "Commit with clear message"
+
+  when_encountering_conflict:
+    - "STOP immediately"
+    - "Document both specifications"
+    - "DO NOT implement either until resolved"
+    - "Conduct resolution research if needed"
+    - "Create conflict resolution ADR"
+    - "Wait for Captain approval"
+    - "Update CANON from approved ADR"
+
+  when_uncertain:
+    - "Check documentation first"
+    - "Review related ADRs and research"
+    - "If still unclear, ask Captain"
+    - "Do not guess or assume"
+    - "Better to ask than implement incorrectly"
+
+# =============================================================================
+# DOCUMENT METADATA
+# =============================================================================
+
+metadata:
+  version: "1.0.0"
+  status: "ACTIVE"
+  last_review: "2025-10-15"
+  next_review: "Quarterly or when process changes"
+  owner: "Captain SpectraSynq"
+  related_docs:
+    - "METHODOLOGY.md - Complete research-first process"
+    - "ADR_GUIDE.md - How to write Architecture Decision Records"
+    - "VALIDATION_GUIDE.md - Validation procedures and checklists"
+    - "CANON.md - Single source of truth (auto-generated)"
+    - "Implementation Brief - Phase 1-4 documentation"
+
+# =============================================================================
+# END OF AGENT RULES
+# =============================================================================

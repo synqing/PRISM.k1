@@ -1,0 +1,19 @@
+# Multi-Agent System - Task Routing Configuration
+
+strategy: skill-based-with-load-balancing
+
+scoring:
+  skill_match: 10       # Points per matching skill
+  priority_boost: 5     # Points for priority match
+  load_penalty: 2       # Penalty per active task
+  critical_bonus: 15    # Bonus for critical path agents
+  research_bonus: 8     # Bonus if task needs research
+
+limits:
+  max_load_imbalance: 1.5  # Rebalance if load > 1.5x average
+  max_stale_time: 7200     # Auto-reset tasks older than 2 hours
+
+fortress_integration:
+  read_canon_on_claim: true         # Read CANON before claiming
+  validate_before_push: true        # Validate against CANON before push
+  cite_adrs_in_code: true          # Require ADR references in comments

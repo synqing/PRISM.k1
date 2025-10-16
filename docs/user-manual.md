@@ -36,3 +36,17 @@ PRISM K1 firmware v1.1 introduces temporal sequencing — the ability to stagger
 - WAVE uses precomputed `sin8` table for smooth motion with minimal CPU.
 - Profiling can be enabled via `menuconfig → PRISM Playback → Enable temporal profiling`.
 
+## Developer Diagnostics
+
+Advanced (optional): Enable temporal profiling and export live metrics for validation and soak tests.
+
+- Enable profiling: `menuconfig → Components → PRISM Playback → Enable temporal profiling`
+- Choose counters: enable D$/I$ hit/miss and instruction count as needed
+- HTTP export (when enabled in Kconfig):
+  - JSON: `GET /metrics/wave`
+  - Prometheus: `GET /metrics` (text exposition)
+  - CSV: `GET /metrics.csv`
+- CLI export: run `prism_metrics` in the console to print a snapshot
+- Optional background push: enable in Kconfig and set URL + interval
+
+These developer features are intended for testing and should be disabled in production builds.

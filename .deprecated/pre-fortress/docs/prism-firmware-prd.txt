@@ -1,0 +1,325 @@
+# PRISM K1 Firmware Implementation PRD
+
+## Overview
+Build ESP32-S3 firmware for PRISM LED controller supporting 60-second setup, WebSocket control, and 15-20 template patterns. Focus on reliability, minimal memory footprint, and instant pattern switching via structural efficiency (not compression).
+
+## Why
+- Current market demands sub-minute setup (competitors: 5+ minutes)
+- Users expect template-first experience (80% never create custom)
+- ESP32 constraints require careful architecture (512KB RAM, fragmentation risk)
+- WebSocket enables real-time preview during upload
+
+## Success Criteria
+- Memory: <150KB heap usage at runtime, zero fragmentation after 24h
+- Performance: <100ms pattern switch, 60 FPS LED output
+- Reliability: 99.9% uptime, graceful WiFi recovery
+- Storage: 25-35 patterns in 1.47MB LittleFS
+- Templates: 15 working patterns on first boot
+- Protocol: WebSocket stable at 500KB/s transfer
+
+## Core Features
+
+### WebSocket Communication Layer
+- Binary protocol with TLV message structure
+- Message types: PUT_BEGIN, PUT_DATA, PUT_END, CONTROL, STATUS
+- 8KB receive buffer (prevents fragmentation)
+- Automatic reconnection with exponential backoff
+- Error codes: 0x01 (busy), 0x02 (storage full), 0x03 (invalid format)
+
+### Storage System (LittleFS)
+- Partition: 1.47MB usable space
+- File structure: /patterns/*.prism, /templates/*.prism
+- Structural efficiency: Shared palettes, delta encoding, hot cache
+- Pattern header: 1KB metadata (uncompressed for instant access)
+- Write verification with CRC32
+
+### Pattern Playback Engine
+- Double-buffered LED output (no flicker)
+- 60 FPS update rate via hardware timer
+- Effect blending with crossfade
+- Parameter interpolation (smooth transitions)
+- Hot cache: 3-5 patterns in RAM for instant switching
+
+### Template System
+- 15 patterns pre-loaded in flash
+- Categories: Ambient (5), Energy (5), Special (5)
+- One-click deployment via WebSocket
+- Template metadata: name, preview, parameters
+
+### Network Management
+- WiFi AP mode for initial setup
+- mDNS broadcasting ("prism-k1.local")
+- Captive portal for configuration
+- Credential storage in NVS
+- Auto-reconnect on disconnect
+
+# Technical Architecture
+
+## Hardware Constraints
+- MCU: ESP32-S3 (dual-core 240MHz)
+- RAM: 512KB total (300KB usable after system)
+- Flash: 8MB (6.5MB for firmware + storage)
+- LED Output: WS2812B protocol via RMT peripheral
+- Power: USB-C (5V 2A minimum)
+
+## Firmware Modules
+
+### Core Infrastructure (Week 1)
+- esp_system_init.c
+  - ESP-IDF v5.x initialization, partition table, NVS setup
+- memory_manager.c
+  - Custom allocator with fragmentation monitoring, heap statistics
+- error_handler.c
+  - Error codes, logging, graceful degradation
+
+### Communication Layer (Week 1)
+- websocket_handler.c
+  - Binary frame parsing, message queue, state machine
+- protocol_parser.c
+  - TLV decoding, CRC validation, command dispatch
+- network_manager.c
+  - WiFi lifecycle, mDNS, reconnection logic
+
+### Storage Layer (Week 2)
+- pattern_storage.c
+  - LittleFS operations, file management, space monitoring
+- pattern_format.c
+  - .prism format parser, header extraction, validation
+- cache_manager.c
+  - Hot cache implementation, LRU eviction, preloading
+
+### Playback Engine (Week 2)
+- led_driver.c
+  - RMT peripheral control, double buffering, timing
+- effect_engine.c
+  - Pattern interpreter, parameter processing, transitions
+- animation_timer.c
+  - 60 FPS hardware timer, frame scheduling
+
+### Template System (Week 3)
+- template_loader.c
+  - Flash storage, metadata parsing, deployment
+- template_patterns.c
+  - 15 hardcoded patterns (Pulse, Wave, Sparkle, etc.)
+
+## Configuration Constants
+
+```c
+// Not 79 tokens - just what we need
+#define WS_BUFFER_SIZE      8192
+#define WS_TIMEOUT_MS       5000
+#define PATTERN_CACHE_SIZE  5
+#define LED_FPS            60
+#define LED_COUNT          150
+#define WIFI_RETRY_MAX     10
+#define STORAGE_PATH       "/littlefs"
+#define PATTERN_VERSION    0x01
+#define MAX_PATTERN_SIZE   204800  // 200KB
+```
+
+## Message Protocol
+
+### WebSocket Binary Format
+```
+[TYPE:1][LENGTH:2][PAYLOAD:N][CRC:4]
+
+Types:
+0x10 - PUT_BEGIN {filename, size, crc}
+0x11 - PUT_DATA {offset, data}
+0x12 - PUT_END {success}
+0x20 - CONTROL {command, params}
+0x30 - STATUS {heap, patterns, uptime}
+```
+
+### State Machine
+```
+IDLE -> RECEIVING -> VALIDATING -> STORING -> IDLE
+         ↓                ↓           ↓
+       ERROR           ERROR       ERROR
+         ↓                ↓           ↓
+       IDLE            IDLE        IDLE
+```
+
+# Acceptance & Quality Gates
+
+## Phase 1: Core Infrastructure (Days 1-3)
+- ESP-IDF project builds with CMake
+- Serial console shows boot messages
+- WiFi AP mode starts ("PRISM-SETUP")
+- Heap monitoring shows <50KB usage
+- WebSocket accepts connections
+- No heap fragmentation after 1000 connect/disconnect cycles
+
+## Phase 2: Communication Protocol (Days 4-5)
+- Binary messages parse correctly
+- PUT_BEGIN/DATA/END sequence works
+- File writes to LittleFS successfully
+- CRC validation catches corrupted data
+- Error codes return properly
+- 500KB/s sustained transfer rate
+
+## Phase 3: Storage System (Days 6-8)
+- LittleFS mounts and formats
+- Patterns save/load/delete
+- Hot cache switches <100ms
+- Structural efficiency: 40% size reduction
+- 25+ patterns fit in partition
+- No filesystem corruption after power cycle
+
+## Phase 4: Playback Engine (Days 9-10)
+- LED output at stable 60 FPS
+- Pattern switching without flicker
+- Parameter changes apply smoothly
+- Memory usage stable during playback
+- CPU usage <50% during animation
+
+## Phase 5: Template System (Days 11-12)
+- 15 templates accessible
+- One-click deployment works
+- Metadata displays correctly
+- Categories organize properly
+- Templates survive firmware updates
+
+# Development Roadmap
+
+## Week 1: Foundation (Priority: CRITICAL)
+- TASK-01: Setup ESP-IDF v5.x project structure
+- TASK-02: Configure partition table (LittleFS 1.5MB)
+- TASK-03: Implement WebSocket server base
+- TASK-04: Create binary protocol parser
+- TASK-05: Add WiFi manager with AP mode
+- TASK-06: Implement heap monitoring
+- TASK-07: Create error handling system
+- TASK-08: Add mDNS broadcasting
+
+## Week 2: Storage & Playback (Priority: HIGH)
+- TASK-09: Initialize LittleFS filesystem
+- TASK-10: Implement .prism format parser
+- TASK-11: Create pattern storage API
+- TASK-12: Build hot cache system
+- TASK-13: Setup RMT LED driver
+- TASK-14: Implement effect engine
+- TASK-15: Add animation timer
+- TASK-16: Create pattern transitions
+
+## Week 3: Templates & Polish (Priority: HIGH)
+- TASK-17: Design 5 ambient templates
+- TASK-18: Design 5 energy templates
+- TASK-19: Design 5 special templates
+- TASK-20: Implement template loader
+- TASK-21: Add template metadata
+- TASK-22: Create deployment system
+- TASK-23: Optimize memory usage
+- TASK-24: Add performance profiling
+
+## Week 4: Testing & Optimization (Priority: MEDIUM)
+- TASK-25: Stress test WebSocket (24h run)
+- TASK-26: Test heap fragmentation
+- TASK-27: Validate pattern switching
+- TASK-28: Test WiFi reconnection
+- TASK-29: Profile power consumption
+- TASK-30: Create OTA update system
+- TASK-31: Document error codes
+- TASK-32: Final optimization pass
+
+# Reusable Module Structure
+
+```
+firmware/
+├── core/
+│   ├── esp_system_init.c
+│   ├── memory_manager.c
+│   └── error_handler.c
+├── network/
+│   ├── websocket_handler.c
+│   ├── protocol_parser.c
+│   └── network_manager.c
+├── storage/
+│   ├── pattern_storage.c
+│   ├── pattern_format.c
+│   └── cache_manager.c
+├── playback/
+│   ├── led_driver.c
+│   ├── effect_engine.c
+│   └── animation_timer.c
+└── templates/
+    ├── template_loader.c
+    └── template_patterns.c
+```
+
+# Critical Path Dependencies
+
+1. ESP-IDF setup (TASK-01) blocks everything
+2. WebSocket (TASK-03) blocks protocol testing
+3. LittleFS (TASK-09) blocks storage features
+4. LED driver (TASK-13) blocks visual testing
+5. Hot cache (TASK-12) blocks performance targets
+6. Templates (TASK-17-19) block user experience
+
+Parallel work possible:
+- Network team: TASK-03,04,05,08
+- Storage team: TASK-09,10,11,12
+- Playback team: TASK-13,14,15,16
+
+# Risks and Mitigations
+
+- **Heap fragmentation kills device after hours**
+  - Mitigation: Fixed-size allocations, memory pools, monitoring
+
+- **WebSocket drops during large transfers**
+  - Mitigation: Chunked transfers, resume capability, CRC checks
+
+- **Pattern switching causes visible glitch**
+  - Mitigation: Double buffering, crossfade, preload next
+
+- **Templates too large for flash**
+  - Mitigation: Structural optimization, shared palettes
+
+- **WiFi reconnect storms router**
+  - Mitigation: Exponential backoff, max retry limit
+
+# Definition of Done
+
+## Per Module
+- Compiles without warnings
+- Memory leaks checked with heap_caps_check_integrity()
+- Error paths tested
+- Serial debug output clear
+- Header documentation complete
+
+## Per Feature
+- Functional requirement met
+- Performance target achieved
+- Memory budget maintained
+- Error handling robust
+- Integration test passes
+
+## Overall Project
+- 15 templates working
+- <100ms pattern switch
+- 60 FPS LED output stable
+- <150KB heap usage
+- Zero heap fragmentation (24h test)
+- WebSocket reliable
+- OTA update functional
+- 25+ patterns fit in storage
+
+# Appendix
+
+## Reference Implementation
+- ESP-IDF Examples: protocols/websocket
+- LittleFS Port: joltwallet/esp_littlefs
+- LED Driver: FastLED-idf
+
+## Testing Hardware
+- ESP32-S3-DevKitC-1
+- WS2812B LED strip (150 pixels)
+- USB power meter
+- WiFi 6 router for testing
+
+## Success Metrics
+- Time to first LED: <60 seconds
+- Pattern switch latency: <100ms
+- Template deployment: <2 seconds
+- Memory stability: 24 hours
+- WebSocket throughput: 500KB/s

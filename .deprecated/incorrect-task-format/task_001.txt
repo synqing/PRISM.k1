@@ -1,0 +1,127 @@
+# Task ID: 001
+# Title: Initialize ESP-IDF v5.x project structure
+# Status: pending
+# Dependencies: none
+# Priority: high
+# CANON ADRs: ADR-001, ADR-002, ADR-003, ADR-004, ADR-005, ADR-006
+# CANON Validated: 2025-10-15
+
+## Description
+Set up the complete ESP-IDF v5.x project with CMake configuration, component structure, and build system. This is the foundation for all subsequent firmware development.
+
+## CANON Specifications
+```yaml
+# System Configuration (from all ADRs)
+esp_idf_version: "v5.x"
+freertos_hz: 1000
+main_task_stack: 8192
+partition_custom: true
+led_count: 320            # ADR-003
+ws_buffer_size: 4096      # ADR-002
+storage_mount_path: "/littlefs"  # ADR-005
+pattern_max_size: 262144  # ADR-004 (256KB)
+pattern_min_count: 15     # ADR-006
+```
+
+## Details
+Create root CMakeLists.txt with `include($ENV{IDF_PATH}/tools/cmake/project.cmake)`. Set up main component with entry point in `firmware/main/main.c`. Configure sdkconfig.defaults with:
+- `CONFIG_FREERTOS_HZ=1000`
+- `CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192`
+- `CONFIG_PARTITION_TABLE_CUSTOM=y`
+- `CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"`
+
+Create idf_component.yml for dependency management.
+
+Component structure:
+```
+firmware/
+├── CMakeLists.txt
+├── sdkconfig.defaults
+├── partitions.csv (to be created in task 002)
+├── main/
+│   ├── CMakeLists.txt
+│   ├── idf_component.yml
+│   └── main.c
+└── components/
+    ├── core/
+    ├── network/
+    ├── storage/
+    ├── playback/
+    └── templates/
+```
+
+## Test Strategy
+1. Run `idf.py build` to verify successful compilation
+2. Check that all components are detected by the build system
+3. Verify sdkconfig.defaults values are applied
+4. Ensure component registration works correctly
+5. Check build output shows ESP-IDF v5.x version
+
+## Agent Guidance
+Step-by-step execution:
+
+1. **Verify ESP-IDF v5.x installed:**
+   ```bash
+   idf.py --version
+   ```
+
+2. **Create root CMakeLists.txt:**
+   ```cmake
+   cmake_minimum_required(VERSION 3.16)
+   include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+   project(prism_k1)
+   ```
+
+3. **Create firmware/main/CMakeLists.txt:**
+   ```cmake
+   idf_component_register(SRCS "main.c"
+                          INCLUDE_DIRS ".")
+   ```
+
+4. **Create firmware/main/main.c:**
+   ```c
+   #include <stdio.h>
+   #include "esp_system.h"
+   #include "esp_log.h"
+
+   static const char *TAG = "PRISM";
+
+   void app_main(void) {
+       ESP_LOGI(TAG, "PRISM K1 Firmware Starting...");
+       ESP_LOGI(TAG, "LED Count: 320");
+       ESP_LOGI(TAG, "WS Buffer: 4096 bytes");
+       ESP_LOGI(TAG, "Storage: /littlefs");
+   }
+   ```
+
+5. **Create sdkconfig.defaults with CANON values:**
+   ```
+   CONFIG_FREERTOS_HZ=1000
+   CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+   CONFIG_PARTITION_TABLE_CUSTOM=y
+   CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+   ```
+
+6. **Create idf_component.yml:**
+   ```yaml
+   dependencies:
+     idf: ">=5.0"
+   ```
+
+7. **Build and verify:**
+   ```bash
+   cd firmware
+   idf.py build
+   ```
+
+8. **Validate CANON alignment:**
+   - Check log messages reference correct constants
+   - Verify build completes without warnings
+   - Confirm component structure matches CANON requirements
+
+## Success Criteria
+- [x] Project builds successfully with `idf.py build`
+- [x] All CANON constants visible in code comments/logs
+- [x] Component structure created and recognized
+- [x] ESP-IDF v5.x version confirmed
+- [x] No build warnings or errors

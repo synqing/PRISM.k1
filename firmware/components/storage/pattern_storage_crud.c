@@ -8,6 +8,11 @@
 
 #include "pattern_storage.h"
 #include "esp_log.h"
+#include "prism_parser.h"
+
+#ifndef PRISM_STRICT_PRISM_VALIDATION
+#define PRISM_STRICT_PRISM_VALIDATION 1
+#endif
 #include <sys/stat.h>
 #include <dirent.h>
 #include <string.h>
@@ -124,6 +129,31 @@ esp_err_t storage_pattern_read(const char *pattern_id, uint8_t *buffer, size_t b
         ESP_LOGE(TAG, "Failed to read complete pattern: read %zu/%ld bytes",
                  bytes_read, st.st_size);
         return ESP_FAIL;
+    }
+    // If this appears to be a .prism file, verify header CRC
+    if (bytes_read >= sizeof(prism_header_v10_t)) {
+        const uint8_t *data = buffer;
+        const prism_header_v10_t *hdr10 = (const prism_header_v10_t *)data;
+        if (memcmp(hdr10->magic, PRISM_MAGIC, 4) == 0) {
+            prism_header_v11_t parsed;
+            esp_err_t perr = parse_prism_header(data, bytes_read, &parsed);
+            if (perr == ESP_OK) {
+                uint32_t calc = calculate_header_crc(&parsed);
+                if (calc != parsed.base.crc32) {
+                    ESP_LOGE(TAG, "Header CRC mismatch: calc=0x%08lX stored=0x%08lX",
+                             (unsigned long)calc, (unsigned long)parsed.base.crc32);
+                    return ESP_ERR_INVALID_CRC;
+                }
+            } else {
+                #if PRISM_STRICT_PRISM_VALIDATION
+                ESP_LOGE(TAG, ".prism header parse failed (%s)", esp_err_to_name(perr));
+                return perr;
+                #else
+                ESP_LOGW(TAG, ".prism header parse failed (%s), continuing without CRC validation",
+                         esp_err_to_name(perr));
+                #endif
+            }
+        }
     }
 
     *out_size = bytes_read;

@@ -1,0 +1,46 @@
+# Task ID: 014
+# Title: Implement pattern delete endpoint
+# Status: pending
+# Dependencies: 011, 004
+# Priority: medium
+# CANON ADRs: ADR-005
+# CANON Validated: 2025-10-15
+
+## Description
+Create DELETE handler with index cleanup for patterns in /littlefs storage.
+
+## CANON Specifications
+```yaml
+# ADR-005: Delete Paths
+patterns_dir: "/littlefs/patterns"  # NOT /prism/patterns
+index_path: "/littlefs/.index.json"
+
+# Response Codes
+success: 200
+not_found: 404
+server_error: 500
+```
+
+## Details
+Parse UUID from URI path. Check file exists at **/littlefs/patterns/<uuid>.prism**. Delete file with prism_fs_delete(). Update **/littlefs/.index.json** to remove entry. Return 404 if not found, 200 on success.
+
+## Test Strategy
+1. Delete existing pattern, verify file removed
+2. Verify /littlefs/.index.json updated
+3. Test deleting non-existent returns 404
+4. Verify disk space reclaimed
+5. Test concurrent delete requests
+
+## Agent Guidance
+1. Implement DELETE /api/patterns/:id
+2. Parse UUID from URI
+3. Build path: /littlefs/patterns/<uuid>.prism
+4. Delete file via prism_fs_delete()
+5. Update /littlefs/.index.json
+6. Return appropriate status code
+
+## Success Criteria
+- [x] Delete removes file from /littlefs
+- [x] Index updated correctly
+- [x] 404 for non-existent patterns
+- [x] 200 on success
