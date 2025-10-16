@@ -1,0 +1,390 @@
+======================================================================
+PRISM K1 - ARCHITECTURE DECISION RECORDS (ADRs)
+Technical Reference for Figma Wireframe Design
+======================================================================
+
+This document contains the core technical specifications from PRISM K1's
+Architecture Decision Records (ADRs) needed for accurate UI/UX design.
+
+======================================================================
+ADR-003: LED COUNT STANDARDIZATION
+======================================================================
+
+Status: APPROVED
+Last Updated: 2025-10-15
+Source: .taskmaster/decisions/003-led-count.md
+
+SPECIFICATION
+-------------
+
+LED count is 320 addressable LEDs.
+
+MACHINE-READABLE PARAMETERS
+---------------------------
+
+```yaml
+led_count: 320
+led_type: WS2812B
+led_fps_target: 60  # Note: Superseded by ADR-008
+```
+
+HARDWARE CONFIGURATION
+----------------------
+
+- Total LEDs: 320 (WS2812B addressable RGB)
+- Channel 1 (CH1): 160 LEDs (bottom edge)
+- Channel 2 (CH2): 160 LEDs (top edge)
+- Edge length: 330mm per edge
+- Dual-edge Light Guide Plate (LGP) architecture
+
+
+======================================================================
+ADR-008: LED REFRESH TARGET INCREASE (60 FPS → 120 FPS)
+======================================================================
+
+Status: APPROVED
+Last Updated: 2025-10-16
+Source: .taskmaster/decisions/008-led-fps-increase.md
+
+SPECIFICATION
+-------------
+
+Increase LED refresh target to 120 FPS.
+
+MACHINE-READABLE PARAMETERS
+---------------------------
+
+```yaml
+led_count: 320          # unchanged
+led_type: WS2812B       # unchanged
+led_fps_target: 120     # updated from 60 FPS
+```
+
+PERFORMANCE IMPACT
+------------------
+
+- Frame time: 8.33ms @ 120 FPS
+- LED transmission: 4.8ms (dual RMT parallel, hardware)
+- CPU budget: 3.38ms per frame
+- Target headroom: 60%+ CPU budget remaining
+
+
+======================================================================
+ADR-010: LGP MOTION ARCHITECTURE - TEMPORAL SEQUENCING
+======================================================================
+
+Status: PROPOSED (Pending Captain Approval)
+Date: 2025-10-16
+Source: .taskmaster/decisions/010-lgp-motion-architecture.md
+
+OVERVIEW
+--------
+
+Dual-dimension motion architecture enabling geometric shape creation
+via temporal sequencing (phi phenomenon):
+
+1. **Motion Direction**: Horizontal propagation along each 160-LED edge
+2. **Sync Mode**: Temporal coordination between top and bottom edges
+
+FOUNDATIONAL CONCEPT: TEMPORAL SEQUENCING
+------------------------------------------
+
+The keyword to creating artistic expression: TEMPORAL SEQUENCING
+- Stagger/trail LED motion between edges
+- Create geometric shapes via Light Guide Plate (LGP)
+- Platform for artistic exploration
+
+HUMAN VISUAL PERCEPTION PHYSICS
+--------------------------------
+
+- **Phi Phenomenon**: 30-200ms inter-stimulus interval creates apparent motion
+- **Optimal range**: 60-150ms delays create strongest geometric perception
+- **Commercial example**: Audi sequential turn signals (140ms total)
+
+OPTICAL PHYSICS
+---------------
+
+- Light from top and bottom edges blends additively across LGP surface
+- Temporal delays between edges create diagonal motion vectors
+- Varying delay by LED position creates geometric shapes:
+  - Triangles
+  - Diamonds
+  - Waves
+  - Arrows
+  - Spirals
+
+
+MOTION DIRECTION ENUM
+---------------------
+
+Controls horizontal propagation along each 160-LED edge:
+
+```c
+typedef enum {
+    PRISM_MOTION_LEFT = 0,      // LED 0 → LED 159 (left-to-right sweep)
+    PRISM_MOTION_RIGHT,         // LED 159 → LED 0 (right-to-left sweep)
+    PRISM_MOTION_CENTER,        // LEDs 79-80 → edges (radial bloom)
+    PRISM_MOTION_EDGE,          // Edges (0+159) → center (radial collapse)
+    PRISM_MOTION_STATIC,        // No propagation (solid/ambient)
+} prism_motion_t;
+```
+
+VISUAL EXAMPLES:
+
+LEFT:     →→→→→→→→→→→→→→  (sweeps left-to-right)
+RIGHT:    ←←←←←←←←←←←←←←  (sweeps right-to-left)
+CENTER:   ←←←← ● →→→→     (blooms from center)
+EDGE:     →→→→ ● ←←←←     (collapses to center)
+STATIC:   ══════════════  (no motion)
+
+
+SYNC MODE ENUM
+--------------
+
+Controls temporal coordination between top and bottom edges:
+
+```c
+typedef enum {
+    PRISM_SYNC_SYNC = 0,        // Both edges fire simultaneously
+    PRISM_SYNC_OFFSET,          // CH2 delayed by fixed time
+    PRISM_SYNC_PROGRESSIVE,     // Delay varies linearly (triangles/wedges)
+    PRISM_SYNC_WAVE,            // Sinusoidal delay pattern (organic motion)
+    PRISM_SYNC_CUSTOM,          // Per-LED timing map (expert control)
+} prism_sync_mode_t;
+```
+
+
+SYNC MODE DETAILS
+-----------------
+
+1. SYNC (Synchronized)
+   - Both edges fire at identical times
+   - Visual: Unified bright surface
+   - Optimization: 50% CPU savings (render once, copy)
+   - Use case: 80% of users (ambient, pulsing, simple effects)
+
+2. OFFSET (Global Delay)
+   - CH2 delayed by fixed milliseconds
+   - Parameters: offset_delay_ms (0-500ms)
+   - Visual: Uniform diagonal sweep (rising or falling)
+   - CPU cost: <0.01μs
+   - Use case: Rising/falling effects, depth illusion
+
+3. PROGRESSIVE (Linear Gradient)
+   - Delay varies linearly from LED 0 to LED 159
+   - Parameters: start_delay_ms, end_delay_ms (0-500ms each)
+   - Visual: Triangular/wedge shapes, diagonal ramps
+   - CPU cost: ~1-2μs
+   - Use case: 15% of users (triangles, arrows, directional sweeps)
+
+   Shape Gallery:
+   - 200ms → 0ms  = Right triangle →
+   - 0ms → 200ms  = Left triangle ←
+   - Peak at center = Diamond ◇
+   - V-shape from center = Chevron ∧
+
+4. WAVE (Sinusoidal)
+   - Delay follows sine wave pattern
+   - Parameters:
+     - wave_amplitude_ms (0-500ms)
+     - wave_period (cycles)
+     - wave_phase_deg (0-359°)
+     - waveform (sin/triangle/sawtooth)
+   - Visual: Organic wave motion, ripples
+   - CPU cost: ~0.5μs
+   - Use case: Wave patterns, spirals, organic motion
+
+5. CUSTOM (Arbitrary Map)
+   - Per-LED timing (160 independent delay values)
+   - Parameters: Array of uint16_t delay_ms[160]
+   - Visual: Unlimited artistic freedom
+   - CPU cost: ~0.5μs
+   - Use case: 5% of users (custom shapes, image-based patterns)
+   - Memory: 320 bytes
+
+
+TEMPORAL OFFSET RANGE
+---------------------
+
+- Minimum offset: 0ms (synchronized)
+- Maximum offset: 500ms
+- Optimal range: 60-300ms (phi phenomenon sweet spot)
+- Default offset: 150ms (balanced perception)
+
+
+PERFORMANCE METRICS
+-------------------
+
+CPU Budget @ 120 FPS:
+- Frame budget: 8.33ms
+- LED transmission: 4.8ms (hardware, RMT)
+- CPU budget: 3.38ms
+
+Temporal Sequencing Cost:
+- SYNC: 0μs (0%)
+- OFFSET: <0.01μs (0.0003%)
+- PROGRESSIVE: 1-2μs (0.06%)
+- WAVE (LUT): 0.5μs (0.015%)
+- CUSTOM: 0.5μs (0.015%)
+
+Combined worst case:
+- Complex effect: 1,200μs (35.5%)
+- WAVE temporal: 0.5μs (0.015%)
+- Color calc: 50μs (1.5%)
+- Buffer ops: 50μs (1.5%)
+- Total: 1,300μs = 38.5% of CPU budget
+- Headroom: 61.5% ✅
+
+Memory Budget:
+- LED driver buffers: 1,920 bytes (0.37% of 512KB RAM)
+- Temporal delay LUT: 320 bytes (0.06%)
+- CUSTOM delay map: 320 bytes (0.06%)
+- Total: 2,560 bytes (0.5% of RAM)
+
+
+SHAPE CREATION EXAMPLES
+-----------------------
+
+Triangle (Right-Pointing →):
+- Motion: LEFT (sweeps left-to-right)
+- Sync: PROGRESSIVE
+- Parameters: start_ms=200, end_ms=0
+- Result: Diagonal from bottom-left to top-right
+
+Diamond (◇):
+- Motion: CENTER (blooms from center)
+- Sync: CUSTOM (peak delay at center, zero at edges)
+- Result: Diamond shape expanding from center
+
+Wave (~~~~~):
+- Motion: LEFT (sweeps left-to-right)
+- Sync: WAVE
+- Parameters: amplitude_ms=100, period=2, phase_deg=0
+- Result: Sinusoidal wave sweeping across LGP
+
+
+PATTERN FORMAT INTEGRATION
+---------------------------
+
+.prism v1.1 Binary Structure:
+
+- Header size: 70 bytes (was 64 in v1.0)
+- Version: v1.1 (minor bump from v1.0)
+- New fields:
+  - motion: 1 byte (prism_motion_t)
+  - sync_mode: 1 byte (prism_sync_mode_t)
+  - sync_params: 6 bytes (union, mode-specific)
+
+
+USER DISTRIBUTION
+-----------------
+
+- 80% of users: SYNC mode (simple, unified surface)
+- 15% of users: PROGRESSIVE/OFFSET modes (triangles, rising effects)
+- 5% of users: WAVE/CUSTOM modes (advanced artistic control)
+
+
+USE CASE EXAMPLES
+-----------------
+
+1. Simple Ambient Glow (80% of users):
+   - Effect: BREATHE
+   - Motion: CENTER (radial bloom)
+   - Sync: SYNC (synchronized edges)
+   - Result: Soft breathing, maximum brightness, 50% CPU savings
+
+2. Rising Fire Effect:
+   - Effect: FIRE
+   - Motion: LEFT (sweeps left-to-right)
+   - Sync: OFFSET (delay_ms=150)
+   - Result: Fire climbs from bottom to top edge
+
+3. Diagonal Wave:
+   - Effect: WAVE
+   - Motion: LEFT (horizontal sweep)
+   - Sync: PROGRESSIVE (start_ms=200, end_ms=0)
+   - Result: Wave flows diagonally from bottom-left to top-right
+
+4. Organic Ripple:
+   - Effect: PLASMA
+   - Motion: CENTER
+   - Sync: WAVE (amplitude_ms=100, period=2)
+   - Result: Organic plasma ripples with vertical sine motion
+
+
+UI/UX DESIGN CONSIDERATIONS
+----------------------------
+
+For Pattern Studio Interface:
+
+1. Motion Direction Controls:
+   - 5 radio buttons or dropdown: LEFT, RIGHT, CENTER, EDGE, STATIC
+   - Visual icons showing arrow directions
+   - Default: CENTER (most common)
+
+2. Sync Mode Controls:
+   - 5 tabs or accordion: SYNC, OFFSET, PROGRESSIVE, WAVE, CUSTOM
+   - Mode-specific parameter panels (show/hide based on selection)
+   - Default: SYNC (80% of users)
+
+3. Temporal Offset Controls:
+   - OFFSET mode: Single slider (0-500ms)
+   - PROGRESSIVE mode: Two sliders (start/end delay, 0-500ms)
+   - WAVE mode: Amplitude slider + period spinner + phase dial
+   - CUSTOM mode: Visual delay map editor (drag-and-drop interface)
+
+4. Real-time Preview:
+   - Live K1 device preview showing temporal effects
+   - Scrub timeline to see motion at different time offsets
+   - Display phi phenomenon range indicator (60-300ms highlighted)
+
+5. Preset Library:
+   - Pre-defined shape presets: Triangle (L/R), Diamond, Wave, etc.
+   - One-click apply preset (auto-configures motion + sync)
+   - User can save custom presets
+
+6. Expert Mode Toggle:
+   - Simple mode: Hide WAVE/CUSTOM options
+   - Advanced mode: Show all 5 sync modes
+   - Defaults to Simple mode for 95% of users
+
+
+VALIDATION REQUIREMENTS
+------------------------
+
+Hardware Testing:
+1. Visual inspection with LGP hardware
+2. High-speed camera @ 240 FPS (timing measurement)
+3. Phi phenomenon confirmation (1-2 meter viewing distance)
+4. 24+ hour soak test (no frame drops @ 120 FPS)
+
+Performance Testing:
+1. Frame time measurement (esp_timer_get_time())
+2. All sync modes within 3.38ms CPU budget
+3. 120 FPS sustained with 60%+ headroom
+
+
+BACKWARD COMPATIBILITY
+----------------------
+
+v1.0 Pattern Migration:
+- v1.0 patterns load without errors
+- Default to SYNC mode (no visual change)
+- Header size: 64 → 70 bytes
+- Version minor bump: 1.0 → 1.1
+- Recalculate CRC after migration
+
+
+======================================================================
+END OF DOCUMENT
+======================================================================
+
+Generated: 2025-10-17
+For: Figma Make AI wireframe reference package
+Contact: PRISM K1 Development Team
+
+This document provides the essential technical specifications needed
+to design a spec-compliant PRISM Studio UI/UX that accurately represents
+the K1 hardware capabilities and motion architecture.
+
+======================================================================
