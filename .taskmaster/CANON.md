@@ -5,7 +5,7 @@
 > **AUTHORITY:** This document is the authoritative specification for PRISM K1.
 > All code, tests, and documentation MUST match these specifications.
 >
-> **GENERATED:** 2025-10-16 10:16:00 UTC
+> **GENERATED:** 2025-10-16 10:17:22 UTC
 > **FROM ADRs:**  001-partition-table.md 002-websocket-buffer.md 003-led-count.md 004-pattern-max-size.md 005-storage-path.md 006-pattern-count-revision.md 007-partition-alignment-correction.md 008-led-fps-increase.md
 > **VALIDATION:** Automated validation required before code changes
 
@@ -254,7 +254,7 @@ This document validated against:
 - **Code constants:** (Run validate-canon.sh)
 - **Partition table:** (Run validate-canon.sh)
 
-**Last Validation:** 2025-10-16 10:16:00 UTC
+**Last Validation:** 2025-10-16 10:17:22 UTC
 **Generator:** canon-generator v1.0.0
 **Status:** GENERATED (validation pending)
 
@@ -277,8 +277,8 @@ This document validated against:
 
 **Document Signature:**
 ```
-Generated: 2025-10-16 10:16:00 UTC
+Generated: 2025-10-16 10:17:22 UTC
 Source: ADR-001 through ADR-008
 Generator: canon-generator v1.0.0
-SHA256: e0ce453e9b93599be1971b9a63422adae081c50938a61cff03b2b90c4c351821
+SHA256: f3a19226889e6ce1d99b3512156ccd9ed39c37e2b4ec498ff06eac9bd5d3bc5a
 ```
