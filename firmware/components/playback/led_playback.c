@@ -107,6 +107,17 @@ void playback_task(void *pvParameters) {
                         frame_ch2[i * 3 + 2] = 0;   // B
                     }
                     wave_prof_end(t0);
+#ifdef CONFIG_PRISM_PROFILE_TEMPORAL
+                    if ((s_pb.frame_counter % 120) == 0 && s_prof_wave.samples) {
+                        uint32_t avg = s_prof_wave.total_cycles / s_prof_wave.samples;
+                        ESP_LOGI(TAG, "WAVE prof: samples=%lu min=%lu max=%lu avg=%lu cycles", (unsigned long)s_prof_wave.samples, (unsigned long)s_prof_wave.min_cycles, (unsigned long)s_prof_wave.max_cycles, (unsigned long)avg);
+                        // Reset accumulators each second window
+                        s_prof_wave.total_cycles = 0;
+                        s_prof_wave.min_cycles = 0;
+                        s_prof_wave.max_cycles = 0;
+                        s_prof_wave.samples = 0;
+                    }
+#endif
                     break;
                 }
                 case EFFECT_PALETTE_CYCLE:
