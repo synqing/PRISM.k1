@@ -12,6 +12,7 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +48,31 @@ void templates_task(void *pvParameters);
  * @return ESP_OK on success, error code otherwise
  */
 esp_err_t templates_deinit(void);
+
+/**
+ * @brief List built-in templates, optionally filtered by category.
+ *
+ * Allocates an array of strings containing template IDs. Caller must free the
+ * list and each string using free(). If category is NULL, returns all.
+ *
+ * @param category Optional category filter: "ambient", "energy", "special"
+ * @param out_ids Output array of C strings (allocated)
+ * @param out_count Output count of entries
+ * @return ESP_OK on success, error otherwise
+ */
+esp_err_t templates_list(const char* category, char*** out_ids, size_t* out_count);
+
+/**
+ * @brief Deploy a template by ID (load and start playback).
+ *
+ * Attempts to load from RAM cache first; if not present, reads from
+ * /littlefs/templates and warms the cache. Then passes the .prism blob to
+ * the playback engine.
+ *
+ * @param template_id Template identifier (e.g., "flow-horizon")
+ * @return ESP_OK on success, error otherwise
+ */
+esp_err_t templates_deploy(const char* template_id);
 
 #ifdef __cplusplus
 }

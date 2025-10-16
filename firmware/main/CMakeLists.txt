@@ -18,4 +18,5 @@ idf_component_register(
         storage
         playback
         templates
+        bench
 )

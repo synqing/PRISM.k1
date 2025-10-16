@@ -23,6 +23,7 @@
 #include "pattern_storage.h"
 #include "led_playback.h"
 #include "template_manager.h"
+#include "bench_decode.h"
 
 static const char *TAG = "PRISM-K1";
 
@@ -157,6 +158,11 @@ void app_main(void)
 
     /* Initialize system */
     ESP_ERROR_CHECK(system_init());
+
+#if CONFIG_PRISM_BENCH_AUTORUN
+    ESP_LOGI(TAG, "PRISM decode bench autorun enabled; running before startup...");
+    (void)bench_decode_run();
+#endif
 
     /* Initialize components (Task 1: Component Scaffolding) */
     ESP_LOGI(TAG, "Initializing firmware components...");

@@ -3,6 +3,7 @@
  * @brief Network management implementation
  */
 
+#include "sdkconfig.h"
 #include "network_manager.h"
 #include "network_private.h"
 #include "protocol_parser.h"
@@ -13,6 +14,7 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_mac.h"
+#include "esp_app_desc.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "mdns.h"
@@ -48,7 +50,7 @@ static esp_err_t metrics_wave_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-#if CONFIG_PRISM_METRICS_PROMETHEUS
+#ifdef CONFIG_PRISM_METRICS_PROMETHEUS
 static esp_err_t metrics_prom_handler(httpd_req_t *req)
 {
     prism_wave_metrics_t m = {0};
@@ -146,7 +148,7 @@ static esp_err_t metrics_csv_handler(httpd_req_t *req)
 #endif
 #endif // CONFIG_PRISM_METRICS_HTTP
 
-#if CONFIG_PRISM_METRICS_PUSH
+#ifdef CONFIG_PRISM_METRICS_PUSH
 static void metrics_push_task(void *arg)
 {
     const TickType_t delay = pdMS_TO_TICKS(CONFIG_PRISM_METRICS_PUSH_INTERVAL_SEC * 1000);
@@ -945,14 +947,17 @@ esp_err_t start_mdns_service(void) {
     }
 
     // Add custom PRISM service for discovery
+    char version_txt[32];
+    const esp_app_desc_t* ad = esp_app_get_description();
+    snprintf(version_txt, sizeof(version_txt), "%s", ad ? ad->version : "unknown");
     mdns_txt_item_t prism_txt[] = {
-        {"version", "1.0"},
-        {"device", "prism-k1"},
-        {"leds", "320"}
+        {"version", version_txt},
+        {"led_count", "320"},
+        {"capabilities", "upload,control,list,delete"}
     };
 
     ret = mdns_service_add(NULL, MDNS_SERVICE_TYPE, MDNS_PROTO, MDNS_PORT,
-                          prism_txt, sizeof(prism_txt) / sizeof(mdns_txt_item_t));
+                           prism_txt, sizeof(prism_txt) / sizeof(mdns_txt_item_t));
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add PRISM service: %s", esp_err_to_name(ret));
         mdns_free();
@@ -1356,6 +1361,35 @@ esp_err_t ws_broadcast_binary(const uint8_t* data, size_t len) {
 
     // Placeholder return
     return (sent_count > 0) ? ESP_OK : ESP_FAIL;
+}
+
+/**
+ * @brief Send binary frame to a specific WebSocket client (by socket FD)
+ */
+esp_err_t ws_send_binary_to_fd(int sockfd, const uint8_t* data, size_t len) {
+    if (!data || len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!g_net_state.http_server) {
+        ESP_LOGW(TAG, "HTTP server not running; cannot send WS frame");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    httpd_ws_frame_t ws_pkt = {0};
+    ws_pkt.type = HTTPD_WS_TYPE_BINARY;
+    ws_pkt.payload = (uint8_t*)data;  // const_cast is safe for send
+    ws_pkt.len = len;
+
+    // Send asynchronously using server handle + socket FD
+    esp_err_t ret = httpd_ws_send_frame_async(g_net_state.http_server, sockfd, &ws_pkt);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "WS send (fd=%d, %zu bytes) failed: %s", sockfd, len, esp_err_to_name(ret));
+    } else {
+        ESP_LOGD(TAG, "WS send (fd=%d): %zu bytes", sockfd, len);
+    }
+
+    return ret;
 }
 
 /* ========================================================================

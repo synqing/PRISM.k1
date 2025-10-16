@@ -197,6 +197,14 @@ esp_err_t template_storage_list(char **template_list, size_t max_count, size_t *
  */
 esp_err_t template_storage_delete(const char *template_id);
 
+/**
+ * @brief Get filesystem space information
+ *
+ * Returns total and used bytes for the mounted LittleFS partition.
+ * If the call fails, returns an error code and does not modify outputs.
+ */
+esp_err_t storage_get_space(size_t* out_total, size_t* out_used);
+
 #ifdef __cplusplus
 }
 #endif

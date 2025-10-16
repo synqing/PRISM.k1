@@ -12,6 +12,7 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +69,36 @@ esp_err_t playback_deinit(void);
 esp_err_t playback_play_builtin(uint16_t effect_id, const uint8_t* params, uint8_t param_count);
 
 /**
+ * @brief Start playback of a packaged .prism pattern.
+ *
+ * @param pattern_id Identifier for logging/telemetry (null-terminated, already normalized)
+ * @param blob Pointer to .prism file bytes
+ * @param blob_size Size of blob in bytes
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t playback_play_prism_blob(const char *pattern_id, const uint8_t *blob, size_t blob_size);
+
+/**
+ * @brief Load a stored pattern from LittleFS and begin playback.
+ *
+ * @param pattern_id Pattern identifier (normalized)
+ * @return ESP_OK on success, ESP_ERR_NOT_FOUND if missing, error otherwise
+ */
+esp_err_t playback_play_pattern_from_storage(const char *pattern_id);
+
+/**
+ * @brief Normalize a user-supplied pattern identifier.
+ *
+ * Converts to lowercase, strips path separators, replaces invalid characters
+ * with underscores, and defaults to "pattern" when empty.
+ *
+ * @param input Raw user-provided identifier (can be NULL)
+ * @param output Destination buffer
+ * @param output_len Length of destination buffer
+ */
+void playback_normalize_pattern_id(const char *input, char *output, size_t output_len);
+
+/**
  * @brief Stop current playback (keeps LED driver running, clears frame).
  * @return ESP_OK on success
  */
@@ -78,6 +109,19 @@ esp_err_t playback_stop(void);
  * @return true if an effect is currently running
  */
 bool playback_is_running(void);
+
+/**
+ * @brief Smoothly ramp global brightness to target over duration.
+ *
+ * Applies a chainable brightness effect that scales all pixels (0-255).
+ * If the effect engine is not active yet, it will be initialized and
+ * brightness will be added with current=target.
+ *
+ * @param target Target brightness (0-255)
+ * @param duration_ms Duration of ramp in milliseconds (0 = immediate)
+ * @return ESP_OK on success
+ */
+esp_err_t playback_set_brightness(uint8_t target, uint32_t duration_ms);
 
 // Profiling metrics accessors (available when CONFIG_PRISM_PROFILE_TEMPORAL=y)
 typedef struct {

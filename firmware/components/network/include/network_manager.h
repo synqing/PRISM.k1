@@ -63,6 +63,19 @@ esp_err_t network_deinit(void);
  */
 esp_err_t ws_broadcast_binary(const uint8_t* data, size_t len);
 
+/**
+ * @brief Send binary WebSocket frame to a specific client by socket FD
+ *
+ * Uses httpd_ws_send_frame_async() to send a binary frame to the client
+ * identified by its socket file descriptor.
+ *
+ * @param sockfd Client socket file descriptor (from httpd_req_to_sockfd)
+ * @param data Pointer to binary frame payload
+ * @param len Length of payload in bytes
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t ws_send_binary_to_fd(int sockfd, const uint8_t* data, size_t len);
+
 #ifdef __cplusplus
 }
 #endif

@@ -19,10 +19,16 @@
 #include "pattern_metadata.h"  // Motion/sync enums and validators (Task 13.2)
 #include "led_driver.h"
 #include "led_playback.h"
+#include "template_manager.h"  // templates_deploy, templates_list
+#include "template_patterns.h" // template_catalog_get
 #include "esp_log.h"
 #include "esp_rom_crc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "network_manager.h"
+#include <dirent.h>
+#include <sys/stat.h>
+#include "esp_app_desc.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -216,6 +222,64 @@ static uint32_t get_time_ms(void)
     return (xTaskGetTickCount() * portTICK_PERIOD_MS);
 }
 
+/**
+ * @brief Build and send TLV-encoded response over WebSocket
+ *
+ * Format: [TYPE:1][LENGTH:2 big-endian][PAYLOAD:N][CRC32:4 big-endian]
+ */
+static esp_err_t send_tlv_response(int client_fd, uint8_t msg_type, const uint8_t* payload, size_t len)
+{
+    if (len > TLV_MAX_PAYLOAD_SIZE) {
+        ESP_LOGE(TAG, "send_tlv_response: payload too large (%zu)", len);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    size_t frame_len = TLV_HEADER_SIZE + len + TLV_CRC32_SIZE;
+    uint8_t* frame = (uint8_t*)malloc(frame_len);
+    if (!frame) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Header
+    frame[0] = msg_type;
+    frame[1] = (len >> 8) & 0xFF;
+    frame[2] = (len) & 0xFF;
+
+    // Payload
+    if (payload && len > 0) {
+        memcpy(&frame[3], payload, len);
+    }
+
+    // CRC32 over TYPE+LENGTH+PAYLOAD (big-endian write)
+    uint32_t crc = esp_rom_crc32_le(0, frame, TLV_HEADER_SIZE + len);
+    size_t crc_off = TLV_HEADER_SIZE + len;
+    frame[crc_off + 0] = (crc >> 24) & 0xFF;
+    frame[crc_off + 1] = (crc >> 16) & 0xFF;
+    frame[crc_off + 2] = (crc >> 8) & 0xFF;
+    frame[crc_off + 3] = (crc) & 0xFF;
+
+    esp_err_t ret = ws_send_binary_to_fd(client_fd, frame, frame_len);
+    free(frame);
+    return ret;
+}
+
+/**
+ * @brief Convenience error sender (ERROR message with code + text)
+ */
+static esp_err_t send_error_response(int client_fd, uint8_t error_code, const char* message)
+{
+    uint8_t buf[256];
+    size_t off = 0;
+    buf[off++] = error_code;
+    if (message && message[0]) {
+        size_t ml = strlen(message);
+        if (ml > sizeof(buf) - 1) ml = sizeof(buf) - 1;
+        memcpy(&buf[off], message, ml);
+        off += ml;
+    }
+    return send_tlv_response(client_fd, MSG_TYPE_ERROR, buf, off);
+}
+
 /* ============================================================================
  * Phase 2: Upload Session Management (Subtask 4.2)
  * ============================================================================ */
@@ -274,9 +338,16 @@ static esp_err_t parse_put_begin_payload(
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Extract filename (copy and null-terminate)
-    memcpy(out_filename, &payload[1], filename_len);
-    out_filename[filename_len] = '\0';
+    // Extract filename (copy and sanitize)
+    char raw_name[PATTERN_MAX_FILENAME];
+    size_t copy_len = filename_len;
+    if (copy_len >= sizeof(raw_name)) {
+        copy_len = sizeof(raw_name) - 1;
+    }
+    memcpy(raw_name, &payload[1], copy_len);
+    raw_name[copy_len] = '\0';
+    playback_normalize_pattern_id(raw_name, out_filename, PATTERN_MAX_FILENAME);
+    ESP_LOGI(TAG, "PUT_BEGIN: pattern id '%s' (raw=%s)", out_filename, raw_name);
 
     // Extract expected size (big-endian)
     size_t offset = 1 + filename_len;
@@ -518,22 +589,32 @@ static esp_err_t handle_put_end(const tlv_frame_t* frame, int client_fd)
     // Transition to STORING state
     g_upload_session.state = UPLOAD_STATE_STORING;
 
-    // Phase 3: Write to storage using Task 5 atomic write API
-    esp_err_t ret = template_storage_write(
-        g_upload_session.filename,
+    char stored_id[PATTERN_MAX_FILENAME];
+    strlcpy(stored_id, g_upload_session.filename, sizeof(stored_id));
+
+    // Remove any existing pattern with the same id (best-effort)
+    esp_err_t ret = storage_pattern_delete(stored_id);
+    if (ret != ESP_OK && ret != ESP_ERR_NOT_FOUND) {
+        ESP_LOGW(TAG, "PUT_END: could not remove existing pattern '%s' (%s)",
+                 stored_id, esp_err_to_name(ret));
+    }
+
+    // Write pattern to persistent storage
+    ret = storage_pattern_create(
+        stored_id,
         g_upload_session.upload_buffer,
         g_upload_session.expected_size
     );
 
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "PUT_END: Storage write failed (%s)", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "PUT_END: storage_pattern_create failed (%s)", esp_err_to_name(ret));
         abort_upload_session("Storage write failed");
         xSemaphoreGive(g_upload_mutex);
         return ret;
     }
 
     ESP_LOGI(TAG, "PUT_END: Pattern '%s' uploaded successfully (%lu bytes)",
-             g_upload_session.filename,
+             stored_id,
              (unsigned long)g_upload_session.expected_size);
 
     // Cleanup and transition to IDLE
@@ -542,7 +623,15 @@ static esp_err_t handle_put_end(const tlv_frame_t* frame, int client_fd)
     g_upload_session.state = UPLOAD_STATE_IDLE;
 
     xSemaphoreGive(g_upload_mutex);
-    return ESP_OK;
+
+    uint8_t ack[PATTERN_MAX_FILENAME + 1] = {0};
+    size_t name_len = strnlen(stored_id, PATTERN_MAX_FILENAME - 1);
+    ack[0] = (uint8_t)name_len;
+    if (name_len > 0) {
+        memcpy(&ack[1], stored_id, name_len);
+    }
+
+    return send_tlv_response(client_fd, MSG_TYPE_STATUS, ack, name_len + 1);
 }
 
 /* ============================================================================
@@ -554,6 +643,8 @@ static esp_err_t handle_put_end(const tlv_frame_t* frame, int client_fd)
 #define CONTROL_CMD_STOP        0x02  /**< Stop pattern playback: {} */
 #define CONTROL_CMD_PAUSE       0x03  /**< Pause playback: {} */
 #define CONTROL_CMD_RESUME      0x04  /**< Resume playback: {} */
+#define CONTROL_CMD_DEPLOY_TPL  0x12  /**< Deploy built-in template: {command(1), len(1), id(N)} */
+#define CONTROL_CMD_BRIGHTNESS  0x10  /**< Set global brightness: {command(1), target(1), duration_ms(2)} */
 
 /**
  * @brief Handle CONTROL command: Playback control
@@ -572,99 +663,304 @@ static esp_err_t handle_put_end(const tlv_frame_t* frame, int client_fd)
  */
 static esp_err_t handle_control(const tlv_frame_t* frame, int client_fd)
 {
-    // Validate payload exists
     if (frame->payload == NULL || frame->length < 1) {
         ESP_LOGE(TAG, "CONTROL: Empty payload (need at least command byte)");
         return ESP_ERR_INVALID_ARG;
     }
-
-    // Extract command byte
     uint8_t command = frame->payload[0];
-
     ESP_LOGI(TAG, "CONTROL: command=0x%02X length=%u", command, frame->length);
 
-    // Dispatch based on command type
     switch (command) {
         case CONTROL_CMD_PLAY: {
-            // Parse pattern name from payload
-            if (frame->length < 3) {  // command(1) + name_len(1) + name(1+)
-                ESP_LOGE(TAG, "CONTROL PLAY: payload too small (%u bytes, min 3)", frame->length);
+            if (frame->length < 3) {
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "play invalid");
                 return ESP_ERR_INVALID_ARG;
             }
 
             uint8_t name_len = frame->payload[1];
             if (name_len == 0 || name_len >= PATTERN_MAX_FILENAME) {
-                ESP_LOGE(TAG, "CONTROL PLAY: invalid pattern name length %u", name_len);
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "name invalid");
                 return ESP_ERR_INVALID_ARG;
             }
 
-            // Validate payload size
             if (frame->length != 2 + name_len) {
-                ESP_LOGE(TAG, "CONTROL PLAY: payload size mismatch (got %u, expected %u)",
-                         frame->length, 2 + name_len);
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "payload mismatch");
                 return ESP_ERR_INVALID_ARG;
             }
 
-            // Extract pattern name
+            char raw_name[PATTERN_MAX_FILENAME];
+            memcpy(raw_name, &frame->payload[2], name_len);
+            raw_name[name_len] = '\0';
+
             char pattern_name[PATTERN_MAX_FILENAME];
-            memcpy(pattern_name, &frame->payload[2], name_len);
-            pattern_name[name_len] = '\0';
+            playback_normalize_pattern_id(raw_name, pattern_name, sizeof(pattern_name));
 
-            ESP_LOGI(TAG, "CONTROL PLAY: pattern='%s'", pattern_name);
-
-            // Integrate with playback engine (built-in effects for now)
-            // Until .prism parser is implemented, map any name to a default built-in effect
-            // EFFECT_PALETTE_CYCLE (0x0040) provides a visible animation
-            extern esp_err_t playback_play_builtin(uint16_t effect_id, const uint8_t* params, uint8_t param_count);
-            esp_err_t ret = playback_play_builtin(0x0040 /* EFFECT_PALETTE_CYCLE */, NULL, 0);
+            esp_err_t ret = playback_play_pattern_from_storage(pattern_name);
             if (ret != ESP_OK) {
-                ESP_LOGE(TAG, "CONTROL PLAY: playback start failed (%s)", esp_err_to_name(ret));
+                uint8_t code = ERR_STORAGE_FULL;
+                if (ret == ESP_ERR_NOT_FOUND) {
+                    code = ERR_NOT_FOUND;
+                } else if (ret == ESP_ERR_INVALID_ARG) {
+                    code = ERR_INVALID_FRAME;
+                }
+                (void)send_error_response(client_fd, code, "play failed");
                 return ret;
             }
 
-            ESP_LOGI(TAG, "CONTROL PLAY: playback engine started (effect palette cycle)");
-            return ESP_OK;
+            uint8_t payload[PATTERN_MAX_FILENAME + 2];
+            size_t off = 0;
+            payload[off++] = 0x00;
+            size_t nl = strnlen(pattern_name, sizeof(pattern_name) - 1);
+            memcpy(&payload[off], pattern_name, nl);
+            off += nl;
+            return send_tlv_response(client_fd, MSG_TYPE_STATUS, payload, off);
         }
-
         case CONTROL_CMD_STOP: {
-            ESP_LOGI(TAG, "CONTROL STOP: stopping playback");
-
-            // Stop playback (keep driver active)
-            extern esp_err_t playback_stop(void);
             esp_err_t ret = playback_stop();
             if (ret != ESP_OK) {
-                ESP_LOGE(TAG, "CONTROL STOP: playback_stop failed (%s)", esp_err_to_name(ret));
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "stop failed");
+                return ret;
+            }
+            uint8_t payload[1] = {0x00};
+            return send_tlv_response(client_fd, MSG_TYPE_STATUS, payload, sizeof(payload));
+        }
+        case CONTROL_CMD_BRIGHTNESS: {
+            if (frame->length != 4) {
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "brightness invalid");
+                return ESP_ERR_INVALID_ARG;
+            }
+            uint8_t target = frame->payload[1];
+            uint16_t dur = ((uint16_t)frame->payload[2] << 8) | frame->payload[3];
+            extern esp_err_t playback_set_brightness(uint8_t, uint32_t);
+            esp_err_t ret = playback_set_brightness(target, (uint32_t)dur);
+            if (ret != ESP_OK) {
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "brightness failed");
+                return ret;
+            }
+            char msg[48];
+            int n = snprintf(msg, sizeof(msg), "brightness=%u dur_ms=%u", (unsigned)target, (unsigned)dur);
+            if (n < 0) {
+                n = 0;
+            }
+            if ((size_t)n > sizeof(msg)) {
+                n = sizeof(msg);
+            }
+            uint8_t payload[64]; size_t off = 0; payload[off++] = 0x00;
+            memcpy(&payload[off], msg, (size_t)n); off += (size_t)n;
+            return send_tlv_response(client_fd, MSG_TYPE_STATUS, payload, off);
+        }
+        case CONTROL_CMD_DEPLOY_TPL: {
+            if (frame->length < 3) {
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "deploy invalid");
+                return ESP_ERR_INVALID_ARG;
+            }
+            uint8_t name_len = frame->payload[1];
+            if (name_len == 0 || name_len >= PATTERN_MAX_FILENAME) {
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "name invalid");
+                return ESP_ERR_INVALID_ARG;
+            }
+            if (frame->length != 2 + name_len) {
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "payload mismatch");
+                return ESP_ERR_INVALID_ARG;
+            }
+            char tpl_id[PATTERN_MAX_FILENAME];
+            memcpy(tpl_id, &frame->payload[2], name_len);
+            tpl_id[name_len] = '\0';
+
+            esp_err_t ret = templates_deploy(tpl_id);
+            if (ret != ESP_OK) {
+                uint8_t code = ERR_INVALID_FRAME;
+                if (ret == ESP_ERR_NOT_FOUND) code = ERR_NOT_FOUND;
+                (void)send_error_response(client_fd, code, "deploy failed");
                 return ret;
             }
 
-            ESP_LOGI(TAG, "CONTROL STOP: playback stopped (driver remains running)");
-            return ESP_OK;
+            uint8_t payload[PATTERN_MAX_FILENAME + 2];
+            size_t off = 0; payload[off++] = 0x00;
+            memcpy(&payload[off], tpl_id, name_len); off += name_len;
+            return send_tlv_response(client_fd, MSG_TYPE_STATUS, payload, off);
         }
-
+        case 0x11: {
+            if (frame->length != 5) {
+                (void)send_error_response(client_fd, ERR_INVALID_FRAME, "gamma invalid");
+                return ESP_ERR_INVALID_ARG;
+            }
+            uint16_t gamma_x100 = ((uint16_t)frame->payload[1] << 8) | frame->payload[2];
+            uint16_t dur = ((uint16_t)frame->payload[3] << 8) | frame->payload[4];
+            extern void effect_add_gamma(uint16_t); extern void effect_gamma_set_target(uint16_t, uint32_t);
+            effect_add_gamma(gamma_x100);
+            effect_gamma_set_target(gamma_x100, dur);
+            char msg[64];
+            int n = snprintf(msg, sizeof(msg), "gamma_x100=%u dur_ms=%u", (unsigned)gamma_x100, (unsigned)dur);
+            if (n < 0) {
+                n = 0;
+            }
+            if ((size_t)n > sizeof(msg)) {
+                n = sizeof(msg);
+            }
+            uint8_t payload[80]; size_t off = 0; payload[off++] = 0x00;
+            memcpy(&payload[off], msg, (size_t)n); off += (size_t)n;
+            return send_tlv_response(client_fd, MSG_TYPE_STATUS, payload, off);
+        }
         case CONTROL_CMD_PAUSE:
-            ESP_LOGW(TAG, "CONTROL PAUSE: not yet implemented (pending full playback engine)");
-            return ESP_ERR_NOT_SUPPORTED;
-
         case CONTROL_CMD_RESUME:
-            ESP_LOGW(TAG, "CONTROL RESUME: not yet implemented (pending full playback engine)");
-            return ESP_ERR_NOT_SUPPORTED;
-
         default:
-            ESP_LOGE(TAG, "CONTROL: unknown command 0x%02X", command);
             return ESP_ERR_NOT_SUPPORTED;
     }
 }
-
 static esp_err_t handle_delete(const tlv_frame_t* frame, int client_fd)
 {
-    ESP_LOGW(TAG, "handle_delete: NOT YET IMPLEMENTED (Phase 3)");
-    return ESP_ERR_NOT_SUPPORTED;
+    if (frame->length == 0 || frame->length > PATTERN_MAX_FILENAME) {
+        return send_error_response(client_fd, ERR_INVALID_FRAME, "Empty or oversized filename");
+    }
+
+    // Extract filename
+    char name[PATTERN_MAX_FILENAME + 1];
+    memcpy(name, frame->payload, frame->length);
+    name[frame->length] = '\0';
+
+    // Strip known extensions (.prism or .bin)
+    char* dot = strrchr(name, '.');
+    if (dot && (strcmp(dot, ".prism") == 0 || strcmp(dot, ".bin") == 0)) {
+        *dot = '\0';
+    }
+
+    // Reject path traversal
+    if (strstr(name, "..") || strchr(name, '/')) {
+        return send_error_response(client_fd, ERR_INVALID_FRAME, "Invalid filename");
+    }
+
+    esp_err_t ret = storage_pattern_delete(name);
+    if (ret == ESP_OK) {
+        uint8_t payload[PATTERN_MAX_FILENAME + 1];
+        size_t off = 0;
+        payload[off++] = 0x00; // success code
+        size_t nl = strlen(name);
+        memcpy(&payload[off], name, nl);
+        off += nl;
+        return send_tlv_response(client_fd, MSG_TYPE_STATUS, payload, off);
+    }
+    if (ret == ESP_ERR_NOT_FOUND) {
+        return send_error_response(client_fd, ERR_NOT_FOUND, "Pattern not found");
+    }
+    return send_error_response(client_fd, ERR_STORAGE_FULL, "Delete failed");
 }
 
 static esp_err_t handle_list(const tlv_frame_t* frame, int client_fd)
 {
-    ESP_LOGW(TAG, "handle_list: NOT YET IMPLEMENTED (Phase 3)");
-    return ESP_ERR_NOT_SUPPORTED;
+    (void)frame; // no payload expected
+
+    DIR* dir = opendir("/littlefs/patterns");
+    if (!dir) {
+        return send_error_response(client_fd, ERR_STORAGE_FULL, "Cannot open patterns dir");
+    }
+
+    uint8_t resp[TLV_MAX_PAYLOAD_SIZE];
+    size_t off = 2; // reserve for count
+    uint16_t count = 0;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+
+        // consider only .bin files
+        const char* ext = strrchr(entry->d_name, '.');
+        if (!ext || strcmp(ext, ".bin") != 0) continue;
+
+        // get file stats (build path without format truncation warnings)
+        char path[256];
+        size_t base_len = strlcpy(path, "/littlefs/patterns/", sizeof(path));
+        if (base_len < sizeof(path)) {
+            strlcpy(path + base_len, entry->d_name, sizeof(path) - base_len);
+        }
+        struct stat st;
+        if (stat(path, &st) != 0) continue;
+
+        // prepare name without extension
+        char id[PATTERN_MAX_FILENAME];
+        size_t name_len = (size_t)(ext - entry->d_name);
+        if (name_len == 0 || name_len >= sizeof(id)) continue;
+        memcpy(id, entry->d_name, name_len);
+        id[name_len] = '\0';
+
+        // space check: name_len(2) + name + size(4) + mtime(4)
+        size_t need = 2 + name_len + 4 + 4;
+        if (off + need > sizeof(resp)) {
+            ESP_LOGW(TAG, "LIST truncated due to buffer");
+            break;
+        }
+
+        // write name length (uint16)
+        resp[off++] = (name_len >> 8) & 0xFF;
+        resp[off++] = (name_len) & 0xFF;
+        // write name
+        memcpy(&resp[off], id, name_len);
+        off += name_len;
+        // write size (uint32)
+        uint32_t fsz = (uint32_t)st.st_size;
+        memcpy(&resp[off], &fsz, 4);
+        off += 4;
+        // write timestamp (uint32)
+        uint32_t mtime = (uint32_t)st.st_mtime;
+        memcpy(&resp[off], &mtime, 4);
+        off += 4;
+
+        count++;
+    }
+    closedir(dir);
+
+    // write count at start (uint16)
+    resp[0] = (count >> 8) & 0xFF;
+    resp[1] = (count) & 0xFF;
+
+    return send_tlv_response(client_fd, MSG_TYPE_STATUS, resp, off);
+}
+
+/**
+ * @brief STATUS/HELLO handler: returns device info block
+ * Payload format:
+ *  [0-3]  version length (uint32)
+ *  [..]   version string (ASCII)
+ *  [..]   LED count (uint16)
+ *  [..]   storage available bytes (uint32)
+ *  [..]   max chunk size (uint16)
+ */
+static esp_err_t handle_status(const tlv_frame_t* frame, int client_fd)
+{
+    (void)frame; // no payload expected
+
+    uint8_t resp[256];
+    size_t off = 0;
+
+    // Firmware version from app description
+    const esp_app_desc_t* ad = esp_app_get_description();
+    const char* ver = ad ? ad->version : "unknown";
+    uint32_t vlen = (uint32_t)strlen(ver);
+    memcpy(&resp[off], &vlen, 4); off += 4;
+    memcpy(&resp[off], ver, vlen); off += vlen;
+
+    // LED count
+    uint16_t led_count = 320;
+    memcpy(&resp[off], &led_count, 2); off += 2;
+
+    // LittleFS free space
+    size_t total = 0, used = 0;
+    if (storage_get_space(&total, &used) != ESP_OK) {
+        total = used = 0;
+    }
+    uint32_t avail = (uint32_t)(total - used);
+    memcpy(&resp[off], &avail, 4); off += 4;
+
+    // Max chunk size (ADR-002: 4096 - 7)
+    uint16_t max_chunk = TLV_MAX_PAYLOAD_SIZE;
+    memcpy(&resp[off], &max_chunk, 2); off += 2;
+
+    // Template count (from built-in catalog)
+    size_t tpl_count = 0; (void)template_catalog_get(&tpl_count);
+    uint8_t tplc = (uint8_t)(tpl_count & 0xFF);
+    memcpy(&resp[off], &tplc, 1); off += 1;
+
+    return send_tlv_response(client_fd, MSG_TYPE_STATUS, resp, off);
 }
 
 /* ============================================================================
@@ -715,6 +1011,10 @@ esp_err_t protocol_dispatch_command(
         // Control commands (PRD 0x20)
         case MSG_TYPE_CONTROL:
             ret = handle_control(&frame, client_fd);
+            break;
+
+        case MSG_TYPE_STATUS:
+            ret = handle_status(&frame, client_fd);
             break;
 
         // Extension commands (not in PRD)

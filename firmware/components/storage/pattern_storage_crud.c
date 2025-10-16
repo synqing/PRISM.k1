@@ -7,6 +7,7 @@
  */
 
 #include "pattern_storage.h"
+#include "pattern_cache.h"
 #include "esp_log.h"
 #include "prism_parser.h"
 
@@ -89,6 +90,9 @@ esp_err_t storage_pattern_create(const char *pattern_id, const uint8_t *data, si
     }
 
     ESP_LOGI(TAG, "Pattern created: %s (%zu bytes)", pattern_id, len);
+
+    // Warm cache with newly created pattern (best-effort)
+    (void)pattern_cache_put_copy(pattern_id, data, len);
     return ESP_OK;
 }
 
@@ -97,6 +101,20 @@ esp_err_t storage_pattern_read(const char *pattern_id, uint8_t *buffer, size_t b
         ESP_LOGE(TAG, "Invalid arguments: pattern_id=%p, buffer=%p, out_size=%p",
                  (void*)pattern_id, (void*)buffer, (void*)out_size);
         return ESP_ERR_INVALID_ARG;
+    }
+
+    // Fast path: try RAM cache
+    const uint8_t* cptr = NULL;
+    size_t csize = 0;
+    if (pattern_cache_try_get(pattern_id, &cptr, &csize)) {
+        if (csize > buffer_size) {
+            ESP_LOGE(TAG, "Buffer too small for cached pattern: need %zu, have %zu", csize, buffer_size);
+            return ESP_ERR_INVALID_SIZE;
+        }
+        memcpy(buffer, cptr, csize);
+        *out_size = csize;
+        ESP_LOGD(TAG, "Cache hit: %s (%zu bytes)", pattern_id, csize);
+        return ESP_OK;
     }
 
     char path[MAX_FILENAME];
@@ -158,6 +176,9 @@ esp_err_t storage_pattern_read(const char *pattern_id, uint8_t *buffer, size_t b
 
     *out_size = bytes_read;
     ESP_LOGI(TAG, "Pattern read: %s (%zu bytes)", pattern_id, bytes_read);
+
+    // Insert into cache (best-effort)
+    (void)pattern_cache_put_copy(pattern_id, buffer, bytes_read);
     return ESP_OK;
 }
 
@@ -182,6 +203,9 @@ esp_err_t storage_pattern_delete(const char *pattern_id) {
         ESP_LOGE(TAG, "Failed to delete pattern: %s", pattern_id);
         return ESP_FAIL;
     }
+
+    // Invalidate RAM cache entry
+    pattern_cache_invalidate(pattern_id);
 
     ESP_LOGI(TAG, "Pattern deleted: %s", pattern_id);
     return ESP_OK;

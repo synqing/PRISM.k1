@@ -27,3 +27,6 @@ project(${PROJECT_NAME})
 idf_build_set_property(COMPILE_OPTIONS "-O2" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-ffunction-sections" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-fdata-sections" APPEND)
+
+# Surface linker diagnostics locally to debug silent link failures
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--verbose")

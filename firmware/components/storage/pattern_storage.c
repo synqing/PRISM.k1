@@ -8,6 +8,7 @@
 
 #include "pattern_storage.h"
 #include "esp_littlefs.h"
+#include "pattern_cache.h"
 #include "esp_log.h"
 #include "esp_partition.h"
 
@@ -86,6 +87,12 @@ esp_err_t storage_init(void) {
 
     storage_initialized = true;
     ESP_LOGI(TAG, "Storage subsystem initialized successfully");
+
+    // Initialize RAM hot cache (256KB default)
+    esp_err_t crec = pattern_cache_init(PATTERN_CACHE_DEFAULT_CAPACITY);
+    if (crec != ESP_OK) {
+        ESP_LOGW(TAG, "Pattern cache init failed: %s", esp_err_to_name(crec));
+    }
     return ESP_OK;
 }
 
@@ -117,5 +124,23 @@ esp_err_t storage_deinit(void) {
 
     storage_initialized = false;
     ESP_LOGI(TAG, "Storage subsystem deinitialized");
+
+    // Deinitialize cache
+    pattern_cache_deinit();
+    return ESP_OK;
+}
+
+esp_err_t storage_get_space(size_t* out_total, size_t* out_used)
+{
+    if (!out_total || !out_used) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    size_t total = 0, used = 0;
+    esp_err_t ret = esp_littlefs_info(STORAGE_PARTITION, &total, &used);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    *out_total = total;
+    *out_used = used;
     return ESP_OK;
 }

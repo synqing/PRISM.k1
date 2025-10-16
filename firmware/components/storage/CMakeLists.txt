@@ -4,6 +4,7 @@ idf_component_register(
         "pattern_storage_crud.c"
         "storage_protocol.c"
         "prism_parser.c"
+        "pattern_cache.c"
     INCLUDE_DIRS "include"
     REQUIRES
         playback
