@@ -309,6 +309,12 @@ export default function DevicePanel() {
   const [fps, setFps] = React.useState<number>(120);
   const [color, setColor] = React.useState<string>('#1ec8ff');
   const [paletteStr, setPaletteStr] = React.useState<string>('#ff6b35,#f7931e,#fdc830,#f37335');
+  const [devicePaletteBlend, setDevicePaletteBlend] = React.useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('prism.palette.deviceBlend') || 'false'); } catch { return false; }
+  });
+  const [geometryId, setGeometryId] = React.useState<string>(() => {
+    try { return localStorage.getItem('prism.geometry.id') || 'K1_LGP_v1'; } catch { return 'K1_LGP_v1'; }
+  });
   // Node controls
   const [useGradient, setUseGradient] = React.useState<boolean>(false);
   const [gradC0, setGradC0] = React.useState<string>('#000000');
@@ -495,6 +501,14 @@ export default function DevicePanel() {
                 </label>
                 <label style={{ fontSize: 12, opacity: 0.9, display: 'flex', alignItems: 'center' }}>Palette
                   <input type="text" value={paletteStr} onChange={e => { setPaletteStr(e.target.value); if (upload.phase==='cancelled') upload.reset(); }} placeholder="#ff0000,#00ff00" style={{ width: 240, marginLeft: 4 }} />
+                </label>
+                <label title="If enabled, prefer on-device palette blending when supported" style={{ fontSize: 12, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input type="checkbox" checked={devicePaletteBlend} onChange={e => { setDevicePaletteBlend(e.target.checked); try { localStorage.setItem('prism.palette.deviceBlend', JSON.stringify(e.target.checked)); } catch {} }} /> Device palette blend
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }}>Geometry
+                  <select value={geometryId} onChange={e => { setGeometryId(e.target.value); try { localStorage.setItem('prism.geometry.id', e.target.value); } catch {} }} style={{ marginLeft: 4 }}>
+                    <option value="K1_LGP_v1">K1_LGP_v1</option>
+                  </select>
                 </label>
                 <label style={{ fontSize: 12, opacity: 0.9 }}>
                   <input type="checkbox" checked={useGradient} onChange={e => { setUseGradient(e.target.checked); if (upload.phase==='cancelled') upload.reset(); }} /> Gradient

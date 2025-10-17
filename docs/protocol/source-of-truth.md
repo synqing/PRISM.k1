@@ -59,6 +59,12 @@ Payload fields, little-endian multi-byte integers:
 - App cancels upload by closing WS (no PUT_END); device must clear session on close.
 - App queries STATUS and honors `maxChunk` before PUT_DATA.
 
+## Proposed v0.9 Deltas (for discussion)
+
+- WebSocket frame header: adopt a richer header (type, flags, rsv, seq, len, crc32) behind a STATUS capability bit; provide back-compat with current simple TLV.
+- PUT_END payload: include final CRC in payload when v0.9 is negotiated; current default remains empty payload with device-side CRC recompute.
+- CONTROL types: consider splitting CONTROL subcommands into top-level message types when caps negotiated; otherwise keep CONTROL (0x20) with subcommands.
+
 ## Back‑links (to add in code headers)
 
 - Studio uploader header: link to this file + exact commit SHA.
@@ -74,3 +80,4 @@ Payload fields, little-endian multi-byte integers:
 ## Related Specs
 
 - Motion Node Kit mapping (from FL.ledstrip): `docs/motion/fl-node-kit.md`
+- PR Template adoption notes: `docs/process/pr-templates.md`
