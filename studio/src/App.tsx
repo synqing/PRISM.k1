@@ -2,6 +2,7 @@ import React from 'react';
 import { useProjectStore } from './stores/project';
 import SecureSettings from './features/settings/SecureSettings';
 import DevicePanel from './features/devices/DevicePanel';
+import GraphCanvas from './features/graph/GraphCanvas';
 import LoggerPanel from './features/logger/LoggerPanel';
 import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
 
@@ -164,6 +165,7 @@ export default function App() {
           </label>
         </div>
 
+        <GraphCanvas />
         <DevicePanel />
       </main>
       <div style={{ padding: 24 }}>

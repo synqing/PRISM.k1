@@ -1,0 +1,56 @@
+# Task ID: 8
+# Title: Implement Device Playback & Parameter Controls
+# Status: pending
+# Dependencies: 6, 7
+# Priority: medium
+# Description: Support PLAY/STOP and brightness/gamma adjustments per firmware CONTROL subcommands.
+# Details:
+Extend Tauri with `device_control_play`, `device_control_stop`, and `device_control_params` that wrap TLV CONTROL messages (type 0x31) with subcommand bytes for play/stop/brightness/gamma as defined in firmware spec. Update `DevicePanel.tsx` to surface buttons/toggles and sliders (0–100% brightness, gamma 1.0–3.0) bound to these commands, reflecting status via websockets or follow-up STATUS calls. Log actions through `lib/logger.ts` and disable controls when no device selected or upload in-flight.
+Wireframe refs: Transport controls and device controls per wireframe Devices and Timeline tabs.
+
+Acceptance Checklist (wireframe parity)
+- [ ] PLAY/STOP buttons and shortcuts (mod+P/S) work
+- [ ] Brightness/gamma sliders ramp with 100–150ms throttle
+- [ ] Values clamped and validated before CONTROL
+
+# Test Strategy:
+Add Rust unit tests asserting CONTROL TLV payload layout. Write React tests confirming sliders call the correct Tauri invoke args and that UI disables appropriately when device not connected.
+Controls/shortcuts verified against wireframe interactions (labels, focus, ramp semantics).
+
+# Subtasks:
+## 1. Implement TLV control commands in Tauri [pending]
+### Dependencies: None
+### Description: Add TLV wrappers for playback and parameter control commands in the Tauri backend.
+### Details:
+Create device_control_play, device_control_stop, and device_control_params that wrap CONTROL type 0x31 messages with firmware-defined subcommand bytes and encode brightness and gamma payloads correctly.
+
+## 2. Add playback and parameter UI controls [pending]
+### Dependencies: 8.1
+### Description: Expose playback toggles and parameter sliders in DevicePanel tied to new backend commands.
+### Details:
+Update DevicePanel.tsx to render play/stop buttons and sliders for brightness 0–100% and gamma 1.0–3.0, binding each control to the new Tauri invokes and managing local state for current values.
+
+## 3. Integrate status feedback and logging [pending]
+### Dependencies: 8.1, 8.2
+### Description: Handle control state feedback, logging, and disable conditions across the panel.
+### Details:
+Wire websocket or STATUS polling responses to update control indicators, route user actions through lib/logger.ts, and enforce disabled states during uploads or when no device is active.
+
+## 4. Keyboard shortcuts & a11y tests [pending]
+### Dependencies: 8.2
+### Description: Add WCAG-friendly shortcuts (Play/Stop, brightness/gamma adjust) and RTL tests for focus/aria.
+### Details:
+Implement mod+P (play), mod+S (stop), Arrow keys for sliders with proper aria attributes.
+
+## 5. Throttled ramp semantics & validation [pending]
+### Dependencies: 8.2
+### Description: Throttle brightness/gamma slider updates and validate ranges before CONTROL dispatch.
+### Details:
+100–150ms throttle; clamp values; guard disabled state during uploads.
+
+## 6. Error mapper + toasts for CONTROL [pending]
+### Dependencies: 8.2
+### Description: Map CONTROL errors to friendly messages and surface as toasts/logs.
+### Details:
+Reuse error util; ensure non-fatal STOP errors are informational.
+

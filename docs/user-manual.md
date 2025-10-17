@@ -35,6 +35,23 @@ PRISM K1 firmware v1.1 introduces temporal sequencing — the ability to stagger
 
 - WAVE uses precomputed `sin8` table for smooth motion with minimal CPU.
 - Profiling can be enabled via `menuconfig → PRISM Playback → Enable temporal profiling`.
+- Packaged presets (JSON/CSV/PRISM) live under `out/presets/` (zip archive: `out/presets_v1.1.zip`); use `python3 -m tools.prism_packaging` to create additional bundles.
+
+### Resources
+
+- 📽️ Tutorial series (10–15 min each): <!-- TODO: add YouTube playlist link once published -->
+  - Video 1: Introduction to PRISM K1 and Temporal Sequencing
+  - Video 2: Motion Directions Explained
+  - Video 3: Sync Modes Deep Dive
+  - Video 4: Creating Your First Pattern
+  - Video 5: Advanced Techniques — WAVE & CUSTOM
+- 📚 Release notes: `docs/release/v1.1_release_notes.md`
+- 🧪 Soak test runbook: `docs/release/soak_test_runbook.md`
+- 🧾 Soak report template: `docs/release/soak_test_report.md`
+- 🔁 OTA validation checklist: `docs/release/ota_validation_checklist.md`
+- 🎛️ Automation scripts:
+  - Playlist generator: `python3 -m tools.validation.soak_playlist --help`
+  - Telemetry summariser: `python3 -m tools.validation.soak_telemetry --help`
 
 ## Developer Diagnostics
 

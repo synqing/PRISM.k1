@@ -24,9 +24,10 @@ node_modules/
 # OS specific
 .DS_Store
 
-# Task files
-# tasks.json
-# tasks/ 
 .beads/*.db
 .beads/*.db-*
 .tools/
+
+# Task files
+# tasks.json
+# tasks/ 

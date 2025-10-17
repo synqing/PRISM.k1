@@ -1,0 +1,66 @@
+# Task ID: 3
+# Title: Implement Graph Evaluation Engine
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Evaluate authored node graphs into frame buffers at 60–120 FPS on the host, with an operator registry and compile cache supporting deterministic evaluation.
+# Details:
+Implement `studio/src/lib/graph/evaluator.ts` to compile node graphs into pure evaluator functions and stream frames. Align with existing project structure under `studio/src`. Core requirements:
+- Operators: Deterministic Noise2D (seeded), Gradient, Solid generators; affine transforms (Rotate, Scale, Mirror); combiners (Add, Multiply with clamping); color operators (PaletteMap placeholder, HueShift, Brightness).
+- Topology: Build execution order via topological sort; guard cycles and missing inputs; enforce FPS 60–120.
+- Registry + Compile Cache: Introduce `NodeDef`/`OpDef` types and a typed op registry (e.g., `studio/src/lib/graph/ops/registry.ts`) with parameter specs and ranges. Implement `compile(node)` returning a resolver; add a compile cache keyed by node id + params hash; clamp param inputs to declared ranges.
+- Seeding + Time Base: Define a stable, reproducible seed (from graph/project or node param) and use it to seed Noise2D. Provide deterministic time base `t` in seconds per frame (e.g., `frameIndex / fps`) passed to evaluators to ensure reproducibility across runs.
+- API: `evaluateGraph({ graph, seconds, fps, geometry })` returns/streams `Float32Array` RGB frames sized to 2×160 LEDs (320 px × 3 channels) and exposes hooks for per-frame consumption.
+- Errors: Clear errors for cycles, missing inputs, bad params (out of range), and invalid fps.
+Suggested file organization (adapt if needed):
+- `studio/src/lib/graph/evaluator.ts` – orchestration + topological sort + evaluateGraph
+- `studio/src/lib/graph/ops/*` – op implementations (`noise2d.ts`, `gradient.ts`, `solid.ts`, `affine.ts`, `combine.ts`, `color.ts`) and `registry.ts`
+- `studio/src/lib/graph/types.ts` – `Graph`, `Node`, `Port`, `OpDef`, `NodeDef`, and param range types.
+Performance: Ensure p95 per-frame evaluation for 320 LEDs at 120 FPS is <5ms on dev hardware by minimizing allocations and leveraging compile cache.
+
+# Test Strategy:
+Add Vitest suites under `studio/src/lib/graph/__tests__`:
+- Topology & Validation: cycle detection, missing inputs, fps bounds (60–120), topological order correctness using sample graphs.
+- Registry & Clamping: param range clamping tests and compile cache hit/miss behavior using a node+params hash key.
+- Determinism: seeded Noise2D produces reproducible buffers given the same seed and `t = frameIndex/fps` time base; changing seed or time changes output.
+- Math correctness: HueShift/Brightness arithmetic, affine transforms (Rotate/Scale/Mirror), combiners with clamping.
+- Integration & Frames: `evaluateGraph` yields correct frame count (`seconds × fps`) and buffer size (`320 * 3` floats) for sample graphs.
+- Performance: benchmark harness verifying p95 per-frame eval for 320 LEDs at 120 FPS is <5ms (skip in CI if necessary).
+
+# Subtasks:
+## 1. Design evaluator topology and validation layer [pending]
+### Dependencies: None
+### Description: Establish evaluator scaffolding with data structures for graph nodes, edges, and execution order validation.
+### Details:
+Create `studio/src/lib/graph/evaluator.ts` scaffolding with TypeScript types for nodes/ports, implement guards for missing inputs, enforce fps bounds, and add pure helpers for topological sorting plus cycle detection.
+
+## 2. Implement deterministic node resolver functions [pending]
+### Dependencies: 3.1
+### Description: Add resolver implementations for generators, transforms, combiners, and color operators with deterministic behavior.
+### Details:
+Implement pure resolver factories for Noise2D using seeded simplex-noise, Gradient, Solid generators, affine transforms (Rotate, Scale, Mirror), combiners (Add, Multiply with clamping), and color operations (PaletteMap placeholder, HueShift, Brightness) producing Float32Array outputs.
+
+## 3. Stream evaluated frames via evaluateGraph API [pending]
+### Dependencies: 3.1, 3.2
+### Description: Compose the full evaluation pipeline that builds execution order, executes resolvers per frame, and streams RGB buffers.
+### Details:
+Implement `evaluateGraph({ graph, seconds, fps, geometry })` to topologically order resolvers, evaluate frames for 2×160 LEDs, accumulate Float32Array RGB outputs, and handle frame streaming hooks while propagating errors from invalid graphs.
+
+## 4. Define op registry + compile cache + parameter ranges [pending]
+### Dependencies: 3.1
+### Description: Add typed operator registry with parameter specs, compile() per node, and a compile cache with clamped params.
+### Details:
+Create `NodeDef`/`OpDef` types and parameter range definitions (e.g., min/max/step, enums). Implement a registry module (e.g., `studio/src/lib/graph/ops/registry.ts`) mapping op keys to `OpDef` with typed params and defaults. Provide `compile(node, registry)` that returns a pure evaluator and clamps incoming params to declared ranges. Add a compile cache keyed by stable node id + params hash to avoid rebuilding evaluators across frames.
+
+## 5. Noise2D seeding and deterministic time base [pending]
+### Dependencies: 3.2
+### Description: Integrate stable seeding and a deterministic time base for Noise2D and time-dependent ops.
+### Details:
+Derive a stable seed (e.g., from project/graph seed or explicit node param) and pass it to seeded Noise2D. Define a deterministic time base `t = frameIndex / fps` provided to evaluators so repeated runs with the same graph, seed, and fps produce identical outputs.
+
+## 6. Test vectors and performance benchmark (<5 ms) [pending]
+### Dependencies: 3.2, 3.4
+### Description: Provide golden test vectors and a perf harness ensuring p95 < 5ms per frame for 320 LEDs @120 FPS.
+### Details:
+Author Vitest cases for Solid, Gradient, Brightness, Rotate, and Noise2D operators producing small golden outputs. Add a performance benchmark that evaluates a representative graph at 320 LEDs × 120 FPS and asserts p95 eval time < 5ms on dev hardware. Use compile cache to minimize per-frame overhead.
+

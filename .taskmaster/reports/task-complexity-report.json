@@ -1,8 +1,8 @@
 {
 	"meta": {
-		"generatedAt": "2025-10-15T23:14:39.958Z",
+		"generatedAt": "2025-10-17T04:19:14.097Z",
 		"tasksAnalyzed": 10,
-		"totalTasks": 20,
+		"totalTasks": 10,
 		"analysisCount": 10,
 		"thresholdScore": 5,
 		"projectName": "Taskmaster",
@@ -10,84 +10,84 @@
 	},
 	"complexityAnalysis": [
 		{
-			"taskId": 11,
-			"taskTitle": "Create Motion & Sync Enumerations and Temporal Interfaces",
-			"complexityScore": 3,
+			"taskId": 1,
+			"taskTitle": "Establish Node Graph State Management",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Implement `studio/src/stores/graph.ts` using `create` + `devtools` + `immer` + `temporal` mirroring `useProjectStore` and `useDeviceStore`. Define `NodeKind`, `ParamValue`, `GraphNode`, `Graph`, and a UI slice excluded from history. Configure zundo with `{ limit: 50, partialize: (s)=>({ graph: s.graph }), equality: (a,b)=>(a as any).graph === (b as any).graph }`. Add actions: `addNode(node, pos?)`, `removeNode(id)`, `updateNodeParams(id,key,value)`, `connectPins(toNodeId,toPin,fromNodeId)` (with self-loop and cycle DFS guard), `setOutputGeometry(geometry)`. Every mutating action increments `graph.revision` and calls `useProjectStore.getState().touch()`. Export `graphUndo`, `graphRedo`, `graphHistoryClear` from `useGraphStore.temporal.getState()`. Extend `studio/src/lib/projectSchema.ts` with `GraphSchema` and add `graph` default in `createEmptyProject` (seed Solid → ToK1). Add `studio/src/stores/graph.test.ts` (undo/redo, pin wiring, autosave touch spy, serialization round-trip) and `studio/src/stores/graph.bench.test.ts` (1k mixed ops, undo/redo timing).",
+			"reasoning": "Zustand + immer + zundo are already patterned in `studio/src/stores/project.ts` and `studio/src/stores/device.ts` with temporal partialization and exported undo/redo; reusing these conventions reduces risk. `ProjectSchema` in `studio/src/lib/projectSchema.ts` lacks a `graph` field, so schema extension and default seeding are required. Cycle checking and connection validation add moderate algorithmic effort, and coupling to `useProjectStore.getState().touch()` ensures autosave consistency. Unit + bench tests and backward‑compatible parsing add implementation weight beyond a simple slice."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Build Visual Node Graph Editor",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Create `studio/src/features/graph/GraphCanvas.tsx` with SVG/canvas layers and node card components bound to `useGraphStore` for nodes/edges. Implement interactions: drag to reposition (UI slice only), toolbar to add nodes, port‑to‑port drag to connect with `canConnect`/validation, keyboard delete. Add ARIA labels and focus management, and wire undo/redo via graph store. Mount the editor in `studio/src/App.tsx` above `DevicePanel`. Add @testing‑library/react tests for adding/moving/connecting/deleting nodes and ensuring DOM ↔ store sync; include a simple mocked store state provider for tests.",
+			"reasoning": "No graph UI exists (`GraphCanvas.tsx` absent); all UI must be built greenfield with gestures, accessibility, and keyboard handling. Existing code uses inline styles and basic components (see `DevicePanel.tsx`), so no graph framework is available to leverage. Tight integration with the new graph store (Task 1) and robust interaction tests push complexity higher."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Implement Graph Evaluation Engine",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Add `studio/src/lib/graph/evaluator.ts` implementing: (1) topology builder with cycle detection and validation (missing inputs, fps bounds 60–120); (2) resolver factories for `Noise2D` (deterministic seeded noise), `Gradient`, `Solid`, affine transforms (`Rotate`,`Scale`,`Mirror`), combiners (`Add`,`Multiply` with clamping), and color ops (`PaletteMap` placeholder, `HueShift`,`Brightness`) producing `Float32Array`; (3) `evaluateGraph({ graph, seconds, fps, geometry })` that compiles resolvers in topological order and yields per‑frame RGB buffers for 2×160 LEDs; (4) Vitest covering topo sort, deterministic noise, math correctness, and frame count = seconds×fps.",
+			"reasoning": "No evaluator or node resolvers exist; this is a pure TS compute pipeline with real‑time goals and error guards. It depends on Task 1’s graph shape and selectors (topo sort). External libs like simplex-noise are not yet installed in `studio/package.json`, and careful typed‑array handling plus performance tests increase scope."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Add OKLCH Palette LUT Generation",
+			"complexityScore": 6,
 			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down the work into defining enums, declaring shared structs/context headers, and documenting/testing the new public API expectations for motion and sync interfaces.",
-			"reasoning": "Mostly header-only definitions with straightforward structs and enum values; requires coordination with ADR-010 and static assertions but minimal control flow or cross-module impact."
+			"expansionPrompt": "Install `culori@^4` and create `studio/src/lib/color/oklchLut.ts` exposing functions to: convert input palettes to OKLCH, interpolate to 256 entries, gamma‑map to 8‑bit sRGB (2.2), and return LUT bytes + metadata. Update color evaluators (`PaletteMap`,`HueShift`,`Brightness`) to consume the LUT helper and output both indexed references and final RGB buffers as needed. Add Vitest ensuring LUT length 256, edge color fidelity, gamma correctness, and PaletteMap index usage.",
+			"reasoning": "Color tooling does not exist and `culori` is not in `studio/package.json`, so you must add a new utility and integrate it into color nodes from Task 3. The logic is self‑contained and testable but has some numerical edge cases (gamma, interpolation). Integration points require small refactors in the evaluator."
 		},
 		{
-			"taskId": 12,
-			"taskTitle": "Implement SYNC and OFFSET Temporal Sequencing",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Separate tasks for context init, SYNC fast path, OFFSET delay handling, performance/timing safeguards, and unit/integration test coverage for both modes.",
-			"reasoning": "Introduces real-time frame computation, FreeRTOS tick handling, and timing instrumentation while meeting CPU budgets—moderate complexity with multiple edge cases and testing needs."
-		},
-		{
-			"taskId": 13,
-			"taskTitle": "Extend .prism v1.1 Header and Parser",
-			"complexityScore": 7,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Create subtasks for struct size updates, CRC/backward-compat adjustments, TLV parsing with validation, legacy defaults, and regression tests plus documentation updates.",
-			"reasoning": "Requires coordinated changes across storage, parser, and temporal modules with strict binary layout, CRC recalculation, and backward compatibility guarantees."
-		},
-		{
-			"taskId": 14,
-			"taskTitle": "Integrate Temporal Calculation with Playback Task",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Plan subtasks for wiring context construction, channel buffering, motion switch scaffolding, demo pattern generation, and integration test/logging validation.",
-			"reasoning": "Integration work touches playback task lifecycles, buffers, pattern assets, and logging; moderate risk ensuring frame safety and sample assets stay in sync."
-		},
-		{
-			"taskId": 15,
-			"taskTitle": "Implement PROGRESSIVE Mode with Shape Presets",
-			"complexityScore": 7,
-			"recommendedSubtasks": 6,
-			"expansionPrompt": "Define subtasks covering delay table generation, motion-direction handling, preset builders, static allocation management, firmware logic updates, and verification tests with goldens.",
-			"reasoning": "Adds new per-LED delay math, motion-aware indexing, preset generation, and persistent buffers; requires careful testing to confirm interpolation correctness and symmetry."
-		},
-		{
-			"taskId": 16,
-			"taskTitle": "Execute Progressive Mode Hardware Validation & Performance Profiling",
+			"taskId": 5,
+			"taskTitle": "Port ADR-009 .prism Packaging to TypeScript",
 			"complexityScore": 8,
-			"recommendedSubtasks": 6,
-			"expansionPrompt": "Outline subtasks for firmware deployment, high-speed capture workflow, quantitative analysis scripts, performance logging, documentation updates, and bug triage/reporting.",
-			"reasoning": "Hardware validation demands coordinated lab work, data capture/analysis, performance measurement, and documentation—logistically complex with multiple deliverables."
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Create `studio/src/lib/bake/packPrism.ts` that assembles ADR‑009 headers, performs XOR‑delta + RLE compression, enforces ≤256 KB cap, embeds palette metadata, and computes CRC‑32 (use `crc-32`). Expose `packPrism({ frames, fps, ledCount, paletteLut }) => { bytes, stats }`. Add Vitest comparing bytes/CRC and header fields against known fixtures (add small golden fixtures under `tools/tests` or generate via Python reference if available). Extend save logic to persist recent bake stats for diagnostics.",
+			"reasoning": "There is no TS packer; only a WS upload helper exists (`studio/scripts/upload-pattern.mjs`). The Python reference is not present in this repo, so ADR‑009 must be implemented from spec and validated via new fixtures or sanity tools (`tools/validation/prism_sanity.py`). Binary assembly, compression, and CRC details make this nontrivial."
 		},
 		{
-			"taskId": 17,
-			"taskTitle": "Add WAVE Mode with Lookup Tables",
-			"complexityScore": 8,
-			"recommendedSubtasks": 6,
-			"expansionPrompt": "Split into subtasks for LUT generator module, table allocation/loading, calculate_ch2_frame wave branch, motion transforms, preset creation, and unit/perf testing.",
-			"reasoning": "Introduces new module, fixed-point waveform math, precomputation, and performance-sensitive render loop paths; high complexity ensuring timing constraints and correctness."
-		},
-		{
-			"taskId": 18,
-			"taskTitle": "Profile and Optimize WAVE Mode Execution",
+			"taskId": 6,
+			"taskTitle": "Implement Streaming Upload Backend",
 			"complexityScore": 7,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Create subtasks for profiling hook implementation, benchmark harness, memory placement audits, heap diagnostics, and report generation with recommendations.",
-			"reasoning": "Focuses on performance tuning with instrumentation, benchmarking, and memory analysis; less code volume but deep optimization and reporting requirements."
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "In `studio/src-tauri/src/lib.rs`, add `#[tauri::command] async fn device_upload(host: String, meta: UploadMeta, pattern: Vec<u8>)` that: validates ≤256 KB; queries STATUS for `maxChunk`; opens a persistent WebSocket; sends TLV `PUT_BEGIN` (name,size,crc), streams `PUT_DATA` in `maxChunk` slices, then `PUT_END`; emits `upload:progress` events with bytes/throughput; maps error TLVs to readable strings. Use existing `tlv_request` and tungstenite patterns as a reference and mirror framing constants from `scripts/upload-pattern.mjs`. Add Rust tests with a mocked tungstenite server for chunking and CRC validation.",
+			"reasoning": "The Tauri backend already implements TLV request helpers and STATUS/LIST/DELETE (`lib.rs`), but no streaming upload exists. A working WS uploader exists in Node (`scripts/upload-pattern.mjs`) that can guide frame formats and error handling. Work includes persistent WS lifecycle, progress events, and robust error mapping."
 		},
 		{
-			"taskId": 19,
-			"taskTitle": "Implement CUSTOM Mode and Web-Based Delay Map Editor",
-			"complexityScore": 9,
-			"recommendedSubtasks": 8,
-			"expansionPrompt": "Plan subtasks spanning firmware support for custom maps, validation logic, web editor UI/UX, curve-to-delay algorithms, import/export tooling, WASM glue, preset seeding, and documentation/tests.",
-			"reasoning": "Combines firmware enhancements with a full-featured web tool, binary serialization, and end-to-end validation; high cross-discipline scope and integration complexity."
+			"taskId": 7,
+			"taskTitle": "Integrate Bake & Upload Workflow in UI",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Add `useUploadStore` (Zustand) to track phase, percent, throughput, timestamps, error, and cancellation. Implement `bakeAndUpload` orchestration that calls evaluator (Task 3), LUT (Task 4), and `packPrism` (Task 5), then invokes Tauri `device_upload` (Task 6), updating progress via store and handling cancel. Mount a primary “Bake & Upload” control in `DevicePanel.tsx` (or `BakePanel.tsx`) with progress UI and TTFL timings; after success, trigger CONTROL PLAY when Task 8 exists. Add component tests stubbing Tauri and asserting progress transitions.",
+			"reasoning": "UI composition patterns exist (see `DevicePanel.tsx` and logger), but this adds a new cross‑module flow orchestrating compute + I/O and reacting to backend `upload:progress` events. It depends on Tasks 2–6, requires a new store slice, and needs careful error propagation and cancellation handling."
 		},
 		{
-			"taskId": 20,
-			"taskTitle": "Finalize Documentation, Migration, and Release Validation",
-			"complexityScore": 9,
-			"recommendedSubtasks": 8,
-			"expansionPrompt": "Break into subtasks for migration CLI, user manual authoring, tutorial production, soak testing plus telemetry analysis, pattern library packaging, release notes, QA checklist, and artifact publication.",
-			"reasoning": "Broad release effort blending tooling, extensive documentation, multimedia content, long-run testing, and release management; highly coordinated work with many deliverables."
+			"taskId": 8,
+			"taskTitle": "Implement Device Playback & Parameter Controls",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Add Tauri commands `device_control_play`, `device_control_stop`, and `device_control_params` that wrap TLV CONTROL (0x31) per firmware subcommands, encoding brightness (0–100%) and gamma (1.0–3.0). Update `DevicePanel.tsx` to render play/stop and sliders bound to invokes, reflect state via STATUS polling or WS responses, and log via `lib/logger.ts`. Add Rust unit tests for CONTROL TLV payloads and React tests asserting correct invoke args and disabled states without a selected device.",
+			"reasoning": "CONTROL wrappers are a straightforward extension of existing TLV patterns in `lib.rs` and UI wiring in `DevicePanel.tsx`. The main work is payload encoding/validation and consistent UI state management. Dependencies on the upload flow are minimal aside from disabling controls during in‑flight operations."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Surface Upload Progress, Errors, and TTFL Metrics",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Subscribe UI to `upload:progress`/`upload:error` and compute TTFL by marking bake, pack, upload, and play timings using `performance.now()`. Implement an error mapping utility for firmware codes (CRC mismatch, TLV_CRC_INVALID, DEVICE_ERROR variants, oversized payload), reusing semantics from `scripts/upload-pattern.mjs`. Render progress bars, TTFL and throughput, and show retry hints for >256 KB payloads or FPS downshift. Add unit tests for error mapping and component tests simulating slow progress and verifying metrics/log output.",
+			"reasoning": "Some building blocks exist (logger, DevicePanel patterns), but adding a robust progress UX with timing and friendly error mapping spans UI, utilities, and event handling. Reusing error semantics from the existing Node uploader helps, but end‑to‑end validation still requires new tests."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Automate Reliability & Performance Validation",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Create `tools/validation/soak_playlist.ts` (or extend the existing Python soak tooling) to drive 50 Bake & Upload cycles via Playwright or a Tauri CLI hook against a loopback device stub that verifies CRC at PUT_END. Add Vitest performance tests ensuring the evaluator sustains 120 FPS for 2×160 LEDs (<16.7 ms/frame) on representative graphs. Document hardware‑in‑loop TTFL checks in `docs/validation/TTFL.md` with steps, expected telemetry, and recovery actions; wire the soak/perf runs into CI with artifact capture.",
+			"reasoning": "There is already soak/validation infrastructure in `tools/validation` and Playwright setup in `studio/e2e`, but nothing orchestrates repeated bake+upload cycles or evaluator throughput assertions yet. Implementing a stubbed device target plus CI harness and documenting manual TTFL verification adds moderate complexity without heavy refactoring."
 		}
 	]
 }

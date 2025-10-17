@@ -1,0 +1,67 @@
+# Task ID: 6
+# Title: Implement Streaming Upload Backend
+# Status: pending
+# Dependencies: 5
+# Priority: high
+# Description: Add Tauri commands to stream .prism payloads over a single WebSocket with PUT_* frames, now including cancel/reconnect handling and 10Hz EMA throughput reporting.
+# Details:
+Extend or create `studio/src-tauri/src/lib.rs` with `#[tauri::command] async fn device_upload(host: String, meta: UploadMeta, pattern: Vec<u8>)`. Use TLV helpers (if not present, add a small module alongside `lib.rs`, e.g., `studio/src-tauri/src/tlv.rs`) to request STATUS for `maxChunk` before any socket work. Establish a persistent websocket session (e.g., via `tokio_tungstenite`) and send firmware-aligned TLV frames: `PUT_BEGIN` (pattern name, size, CRC-32), `PUT_DATA` in `maxChunk` slices, and `PUT_END` with CRC confirmation. Emit progress to the UI via `app.emit("upload:progress", UploadProgress { bytesSent, total, throughputBps })`, throttled to 10Hz, where `throughputBps` is computed as an EMA over a short sliding window. Add cancel handling and single-attempt reconnection: on cancel, stop streaming, close WS, and emit `upload:cancelled`; on transient WS failure, retry once and re-run STATUS to refresh `maxChunk` prior to resuming, otherwise abort with a typed error. Enforce payload size ≤ 256 KB and return detailed errors mapped from firmware STATUS/ERROR TLVs. Use repo guidance in `docs/research/PRISM_Studio_Architecture_Research.md` for Tauri structure and security notes; place integration tests under `studio/src-tauri/tests/` and consider CRC alignment with existing CRC usage in Python utilities under `tools/validation/` (use Rust `crc32fast` for parity).
+Wireframe refs: Device Sync progress/ack now reflected from wireframe docs (PRODUCTION_READY_SUMMARY.md WebSocket Device Sync; WIRED_FUNCTIONALITY.md Upload progress).
+
+Acceptance Checklist (wireframe parity)
+- [ ] STATUS.maxChunk probed before upload
+- [ ] PUT_BEGIN/PUT_DATA/PUT_END acknowledged (per firmware) or handled per policy
+- [ ] Progress events (percent/bytes/s/eta) emitted @<=10Hz
+- [ ] Cancel emits final 'upload:cancelled' and closes WS
+
+# Test Strategy:
+- Unit tests (Rust):
+  - TLV framing helpers: verify correct TLV types and payload packing for PUT_BEGIN/PUT_DATA/PUT_END and STATUS.
+  - Size guard: reject payloads > 256 KB.
+  - Throughput EMA: deterministic sequence verifies EMA/window math and 10Hz throttle behavior.
+- Integration tests (Tokio + mocked tungstenite server) under `studio/src-tauri/tests/`:
+  - Happy path: PUT_BEGIN → PUT_DATA (exact and uneven chunking) → PUT_END; server acks and validates sequencing.
+  - CRC: server-induced CRC mismatch triggers mapped, descriptive error; success path confirms CRC.
+  - Progress: events delivered at ~10Hz, include non-negative `throughputBps`, and reach total bytes.
+  - Cancel: mid-stream cancel stops further frames and emits final `upload:cancelled` event.
+  - Reconnect: forced WS drop triggers one reconnect attempt with a re-STATUS; on second failure, upload aborts with a typed reconnect error.
+  - Timeout: server delay produces a specific timeout error code and message.
+Backend progress events render UI states as per wireframe progress examples.
+
+# Subtasks:
+## 1. Define device_upload command skeleton [pending]
+### Dependencies: None
+### Description: Add the async Tauri command stub with input validation and TLV setup.
+### Details:
+Create `#[tauri::command] async fn device_upload(host: String, meta: UploadMeta, pattern: Vec<u8>)` in `studio/src-tauri/src/lib.rs`. Validate payload size ≤ 256 KB. Derive/calc CRC-32 (e.g., `crc32fast`) and call TLV STATUS to fetch `maxChunk` prior to socket work. Prepare `UploadProgress` struct matching emission payload.
+
+## 2. Stream PUT_* frames over persistent websocket [pending]
+### Dependencies: 6.1
+### Description: Implement the websocket session to stream pattern bytes using TLV PUT frames.
+### Details:
+Open a persistent websocket to the target `host`. Send `PUT_BEGIN` with metadata (pattern name, total size, CRC-32). Iterate the pattern buffer in `maxChunk`-sized slices and send `PUT_DATA` per slice. After the final chunk, send `PUT_END` with CRC confirmation. Await and validate server acks and finalization before returning success.
+
+## 3. Emit progress and translate firmware errors [pending]
+### Dependencies: 6.1, 6.2
+### Description: Report upload progress and map TLV errors to readable failures with tests.
+### Details:
+During streaming, emit app events via `app.emit("upload:progress", UploadProgress { bytesSent, total, throughputBps })`. Capture firmware STATUS/ERROR TLVs and map them to typed, descriptive errors (e.g., codes like `err.status.max_chunk_unsupported`, `err.crc.mismatch`, `err.ws.timeout`). Return a structured Result with these error categories.
+
+## 4. Implement upload cancel and reconnection handling [pending]
+### Dependencies: 6.2
+### Description: Support cancellation and a single reconnection attempt with re-STATUS before aborting.
+### Details:
+Add a cancel path that immediately stops streaming, cleanly closes the websocket, and marks the upload as cancelled; consistently emit `upload:cancelled`. Implement reconnection logic: on WS disconnect/connect error, retry connection once; re-run STATUS to refresh `maxChunk`; if reconnect fails again or STATUS differs incompatibly, abort with a typed reconnect error. Ensure in-progress state is preserved/restored correctly if resuming after reconnect.
+
+## 5. Add progress EMA and throughput reporting [pending]
+### Dependencies: 6.3
+### Description: Report 10Hz-throttled progress events including EMA throughput.
+### Details:
+Compute an EMA throughput (bytes/s) over a short sliding window (e.g., 1–3 s) using monotonically increasing time (Tokio Instant). Include `throughputBps` in progress events. Throttle `upload:progress` emissions to ~10Hz for consistent UI updates and lower overhead. Keep event shape consistent with the existing `UploadProgress` struct in `studio/src-tauri/src/lib.rs` (or a new `events.rs` if modularized).
+
+## 6. Add mock WS device and integration tests [pending]
+### Dependencies: 6.2, 6.3
+### Description: Introduce a mock tungstenite server to validate TLV ACK/CRC behavior and error paths.
+### Details:
+Create a Tokio-based mock WS server helper under `studio/src-tauri/tests/` that: responds to STATUS with `maxChunk`, ACKs `PUT_BEGIN`/`PUT_DATA`/`PUT_END`, validates chunk sizes and total length, verifies CRC, and can inject errors/timeouts (e.g., mid-stream drops, invalid CRC, delayed ACK). Reuse any shared TLV type definitions to ensure parity with client framing.
+

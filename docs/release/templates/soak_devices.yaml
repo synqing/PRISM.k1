@@ -1,0 +1,21 @@
+# Example device configuration for soak automation
+# Copy to logs/soak_devices.yaml and update hostnames/IPs before running scripts.
+
+devices:
+  - id: dev1
+    hostname: prism-k1-lab-01.local
+    notes: "Rev-B hardware, ambient 22°C"
+  - id: dev2
+    hostname: prism-k1-lab-02.local
+    notes: "Rev-C hardware, ambient 22°C"
+  - id: dev3
+    hostname: prism-k1-lab-03.local
+    notes: "Rev-B hardware, ambient 22°C"
+
+playlist:
+  manifest: out/presets/manifest.json
+  dwell_seconds: 300
+  hours: 24
+  shuffle: true
+  seed: 42
+  stagger_seconds: 10

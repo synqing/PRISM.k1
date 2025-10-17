@@ -1,0 +1,62 @@
+# Task ID: 7
+# Title: Integrate Bake & Upload Workflow in UI
+# Status: pending
+# Dependencies: 2, 3, 4, 5, 6
+# Priority: high
+# Description: Wire graph evaluation, packaging, and device upload into a cohesive "Bake & Upload" flow.
+# Details:
+Add a primary button in `DevicePanel.tsx` (or new `BakePanel.tsx`) that triggers `async function bakeAndUpload()` calling evaluator (Task 3), LUT builder (Task 4), packPrism (Task 5), then invokes `device_upload` (Task 6). Show realtime progress via a new Zustand slice (`useUploadStore`) and render percent + throughput with cancel option. After successful upload, auto-call CONTROL PLAY (once Task 8 exists) and log timings to measure TTFL. Persist last bake stats in project metadata for debugging.
+Wireframe refs: Progress panel states (active/cancelled/error), TTFL display, and retry per wireframes.
+
+Acceptance Checklist (wireframe parity)
+- [ ] ProgressPanel shows active/cancelled/error states
+- [ ] TTFL displayed after auto-PLAY
+- [ ] Retry available after error; resets store cleanly
+
+# Test Strategy:
+Create React component tests stubbing Tauri to ensure progress UI updates and error states render; add Playwright E2E that bakes the seeded sample graph, uploads to a mocked backend, and verifies completion banner.
+UI progress/TTFL matches wireframe states across happy-path and error flows.
+
+# Subtasks:
+## 1. Implement upload progress Zustand slice [pending]
+### Dependencies: None
+### Description: Create a dedicated `useUploadStore` slice to track bake/upload progress, errors, timing and cancellation state.
+### Details:
+Define state fields for phase, percent complete, bytes per second, started/completed timestamps, and last error; expose actions to start/reset/cancel uploads, feed progress payloads, and register/unregister the Tauri `upload:*` listeners so UI stays in sync.
+
+## 2. Build bakeAndUpload orchestration flow [pending]
+### Dependencies: 7.1
+### Description: Wire an `async bakeAndUpload` helper that sequences evaluator, LUT builder, packPrism, and device upload while updating the progress store.
+### Details:
+Compose the graph evaluation, LUT generation, and packaging utilities, invoke `device_upload` with cancellation support, emit store updates at each stage, and record timing checkpoints for bake, pack, upload, and overall TTFL to feed metrics.
+
+## 3. Integrate Bake & Upload UI controls [pending]
+### Dependencies: 7.2
+### Description: Add the primary Bake & Upload entry point in `DevicePanel` (or new `BakePanel`), render progress telemetry, and persist post-upload metadata.
+### Details:
+Insert a primary button that invokes `bakeAndUpload`, render progress percent/throughput with cancel option bound to the store, trigger CONTROL PLAY on success when Task 8 is available, surface toast/logging, and save last run metrics into project metadata for debugging.
+
+## 4. Add ProgressPanel component and UI states [pending]
+### Dependencies: 7.2
+### Description: Create ProgressPanel.tsx rendering phase/percent/throughput/eta with cancel and retry; subscribe to upload:* events.
+### Details:
+Mount in DevicePanel; show determinate/indeterminate; disable controls during upload; expose minimal props for reuse.
+
+## 5. Implement error mapping util for Bake/Upload [pending]
+### Dependencies: 7.2
+### Description: Add mapUploadError() to convert backend codes to user guidance and toasts.
+### Details:
+Map NET_*, DEV_*, INT_*, SIZE_*; ensure UI surfaces remediation hints.
+
+## 6. Persist TTFL and last-bake stats [pending]
+### Dependencies: 7.2
+### Description: Save TTFL, sizes, crc to project metadata after success for diagnostics.
+### Details:
+Extend project store save path to include last bake stats; render in UI.
+
+## 7. Playwright E2E for Bake→Upload happy path [pending]
+### Dependencies: 7.2, 7.3
+### Description: End-to-end test (fake backend) that runs Bake→Upload and verifies UI progression.
+### Details:
+Use mocked Tauri events; assert final success and TTFL shown.
+

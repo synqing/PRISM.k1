@@ -105,6 +105,19 @@ export const ProjectSchema = z.object({
   sync: SyncConfigSchema.default({ mode: 'SYNC' }),
   palette: PaletteSchema.default(['#ffffff']),
   description: z.string().optional(),
+  lastBake: z
+    .object({
+      fps: z.number().int().positive(),
+      ledCount: z.number().int().positive(),
+      frames: z.number().int().nonnegative(),
+      payloadSize: z.number().int().nonnegative(),
+      totalSize: z.number().int().nonnegative(),
+      ttflMs: z.number().int().nonnegative().optional(),
+      startedAt: z.number().int().nonnegative().optional(),
+      finishedAt: z.number().int().nonnegative().optional(),
+      throughputBps: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -123,5 +136,6 @@ export function createEmptyProject(name = 'Untitled Project'): Project {
     motion: 'STATIC',
     sync: { mode: 'SYNC' },
     palette: ['#ffffff'],
+    lastBake: undefined,
   };
 }

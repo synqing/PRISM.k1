@@ -1,0 +1,37 @@
+# Task ID: 11
+# Title: Integrate Wireframes with Task Plan
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Map the new wireframe prototype to tasks, align acceptance criteria, and ensure component/interaction parity across Timeline, Device Manager, and Bake→Upload flows.
+# Details:
+Source: User-Facing App Wireframes 3 (local code bundle) and Figma link in README. Produce a traceability matrix linking wireframe screens/components to tasks/subtasks, update acceptance criteria in tasks to reference wireframe states, and flag any gaps as follow-up tasks.
+
+# Test Strategy:
+Traceability matrix present; reviewers can click from each task to the corresponding wireframe section. Acceptance criteria updated to reference specific screen states. All gaps are captured as subtasks or new tasks.
+
+# Subtasks:
+## 1. Create traceability matrix [pending]
+### Dependencies: None
+### Description: List wireframe screens/components and map to tasks/subtasks (2,3,6,7,8,9,10).
+### Details:
+Include paths: User-Facing App Wireframes 3/src/App.tsx, components/prism/*. Reference Figma URL in README.
+
+## 2. Update acceptance criteria with wireframe references [pending]
+### Dependencies: 11.1
+### Description: For tasks 2,6,7,8,9, update acceptance to cite wireframe screen states (Timeline, Devices, Progress).
+### Details:
+Add references like “matches TimelineEditorScreen state A/B/C” and specific UI interactions.
+
+## 3. Component inventory and design tokens alignment [pending]
+### Dependencies: 11.1
+### Description: Inventory wireframe components (Radix UI set) and align with Studio components/tokens.
+### Details:
+List Accordion/Dialog/Slider/Select/Progress; confirm usage and theming match existing tokens.
+
+## 4. Interaction parity checklist [pending]
+### Dependencies: 11.1
+### Description: Document keyboard shortcuts, drag behaviors, and progress states from wireframes and ensure they appear in tasks 2/7/8/9.
+### Details:
+Capture Timeline scrubbing, zoom, device add/remove, progress cancel/retry, auto-play.
+

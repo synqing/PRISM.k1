@@ -1,0 +1,122 @@
+# Task ID: 1
+# Title: Establish Node Graph State Management
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Design the minimal Zustand-backed graph state slice for nodes, pins, and params while matching the undo/redo plus autosave conventions seen in `studio/src/stores/project.ts` (temporal + markDirty/touch) and the leaner `studio/src/stores/timeline.ts` patterns. Extend scope to include NodeDefinitions-based validation and standalone graph selectors. Use zundo temporal with limit 50, partialized to `graph`, and revision-based equality; export a `withHistoryBatch` helper for gesture grouping.
+# Details:
+Codebase alignment and targets (based on repo scan):
+- Stores: `studio/src/stores/project.ts`, `studio/src/stores/device.ts`, and `studio/src/stores/timeline.ts` compose `devtools` + `immer`; `project.ts`/`device.ts` use `zundo` temporal with `limit: 50`, partialized history, and identity equality; exports undo/redo via `useXxxStore.temporal.getState()` (see device export names `deviceUndo/deviceRedo/deviceHistoryClear`).
+- Persistence: `studio/src/lib/projectSchema.ts` currently has no `graph` field; `createEmptyProject` lives here; `serializeProject`/`deserializeProject` are in `studio/src/stores/project.ts`.
+- Vitest setup: `studio/vitest.config.ts` uses `happy-dom`; test files match `src/**/*.test.{ts,tsx}`; see patterns in `studio/src/stores/{project,device}.test.ts`.
+
+Store implementation (zustand + immer + zundo temporal):
+- Add `studio/src/stores/graph.ts` using `create`, `devtools`, `immer`, and `temporal`, mirroring composition in `project.ts`/`device.ts`.
+- Types and shape:
+  - `type NodeKind = 'Noise2D' | 'Gradient' | 'Solid' | 'Rotate' | 'Scale' | 'Mirror' | 'Add' | 'Multiply' | 'PaletteMap' | 'HueShift' | 'Brightness' | 'ToK1'`.
+  - `type ParamValue = number | string`.
+  - `interface GraphNode { id: string; kind: NodeKind; params: Record<string, ParamValue>; inputs: Record<string, string | null>; }`.
+  - `type Graph = { nodes: Record<string, GraphNode>; order: string[]; revision: number; outputGeometry?: { width: number; height: number } }`.
+  - UI slice excluded from history/persistence: `{ layout: Record<string, { x: number; y: number }>; selection: string[] }`.
+- Temporal configuration (update vs. earlier referential plan):
+  - `temporal(immer(...), { limit: 50, partialize: (s) => ({ graph: s.graph }), equality: (a, b) => (a as any).graph?.revision === (b as any).graph?.revision })`.
+  - Rationale: revision-based equality drops redundant frames and formalizes gesture grouping; keep UI-only edits out of history by default.
+- Autosave coupling: do NOT add autosave in graph store; for each mutating action, call `useProjectStore.getState().touch()` (see `studio/src/stores/project.ts` for the hybrid throttle pattern with idle flush and edit thresholds).
+- Actions (all increment `graph.revision` and call `touch()`):
+  - `addNode(node, pos?)`, `removeNode(id)` (clean inbound references), `updateNodeParams(id, key, value)`, `connectPins(toNodeId, toPin, fromNodeId)`, `setOutputGeometry(geometry)`.
+  - `connectPins` must validate nodes and pins, prevent self-loops, and reject cycles via a cheap dependsOn DFS over `inputs`.
+- Exports:
+  - Undo/redo/clear (and pause/resume): `export const { undo: graphUndo, redo: graphRedo, clear: graphHistoryClear, pause: graphHistoryPause, resume: graphHistoryResume } = (useGraphStore as any).temporal.getState();` (matches style in `studio/src/stores/device.ts`).
+  - `withHistoryBatch(fn)`: helper that `pause()`/`resume()` around a function body to coalesce multi-step gestures into one history frame.
+
+NodeDefinitions & validation (new):
+- Add `studio/src/lib/graph/nodeDefinitions.ts` exporting per-`NodeKind` definitions:
+  - For each kind specify: `inputs: Record<string, { required?: boolean; arity?: 1 | 'many' }>` and `params: Record<string, { type: 'number' | 'string' | 'color'; min?: number; max?: number; enum?: string[] }>`.
+- Enforce in graph actions:
+  - `connectPins`: check target node exists; check `toPin` exists per definition; ensure arity constraints; prevent self-connect; run cycle precheck; error codes: `NODE_NOT_FOUND`, `PIN_NOT_FOUND`, `CYCLE`.
+  - `updateNodeParams`: verify param key exists and value matches type/range; error codes: `TYPE_INVALID`, `RANGE_INVALID`.
+  - Emit errors as `throw new Error(<CODE>)` (consistent with `NO_DEVICE` error usage in `studio/src/stores/device.ts`).
+
+Selectors & topology (new):
+- Add `studio/src/stores/graph.selectors.ts` exporting pure utilities that operate on `{ nodes, order }`:
+  - `orderedNodes(graph): GraphNode[]` (map `order` to nodes).
+  - `getEdges(graph): Array<{ from: string; to: string; pin: string }>` (from each node.inputs mapping).
+  - `topoSort(graph): string[]` (throws on cycles; second backstop to `connectPins` precheck).
+  - `canConnect(state, toNodeId, toPin, fromNodeId): { ok: true } | { ok: false; code: 'NODE_NOT_FOUND' | 'PIN_NOT_FOUND' | 'CYCLE' }` (uses NodeDefinitions + DFS).
+- Document gesture grouping policy: UI-only actions (`setNodePosition`, `setSelection`) are excluded from history; for drag gestures that should record once, use `withHistoryBatch` or temporal `pause()` on pointerdown and `resume()` on pointerup.
+
+Project schema and persistence:
+- Extend `studio/src/lib/projectSchema.ts` with a `GraphSchema` matching the Graph shape above, and add `graph: GraphSchema.default(/* Solid → ToK1 seed */)` to `ProjectSchema`.
+- Update `createEmptyProject` to include a seeded graph default: nodes `{ nSolid: { kind: 'Solid', params: { color: '#ffffff' }, inputs: {} }, nToK1: { kind: 'ToK1', params: {}, inputs: { input: 'nSolid' } } }`, `order: ['nSolid','nToK1']`, `revision: 0`.
+- `serializeProject`/`deserializeProject` in `studio/src/stores/project.ts` already round-trip arbitrary fields; older projects parse via GraphSchema defaults.
+
+Benchmarks:
+- Add `studio/src/stores/graph.bench.test.ts` to run ~1,000 mixed ops across graph sizes 25/100/500; mix ~600 param edits, ~200 connect/disconnects, ~200 add/remove pairs; measure total apply/undo/redo times with autosave stubbed (spy on `useProjectStore.getState().touch()`); initial targets ≤2.5s for apply/undo/redo each on typical dev hardware; memory delta ~20–40 MB for N≈100 with limit 50.
+
+Acceptance and risks:
+- Composition matches stores; history partialized to `graph` with `limit: 50` and revision-based equality; required actions exist and call `touch()`; undo/redo work; UI-only edits excluded from history; project schema persists a seeded Solid → ToK1 graph; older projects load with defaults. Risks (snapshot memory/latency, history flooding) mitigated via partialize, modest limit, and grouping; cycle checks via DFS and `topoSort` backstop; autosave duplication avoided by relying on `project.ts` autosave.
+
+
+# Test Strategy:
+- Unit tests: add `studio/src/stores/graph.test.ts` (mirroring `project.test.ts`/`device.test.ts`) covering:
+  - Default seeding (Solid → ToK1 graph) from `createEmptyProject` in `studio/src/lib/projectSchema.ts`.
+  - CRUD flows with guards (duplicate id, not found); `removeNode` cleans inbound references.
+  - Pin wiring with cycle prevention; `canConnect` error-paths.
+  - NodeDefinitions validation: invalid connect emits `NODE_NOT_FOUND`/`PIN_NOT_FOUND`/`CYCLE`; invalid params emit `TYPE_INVALID`/`RANGE_INVALID`.
+  - Undo/redo via `useGraphStore.temporal.getState().undo/redo` and ensure UI-only actions are not recorded.
+  - Autosave coupling: spy on `useProjectStore.getState().touch()` in each mutating action.
+  - Serialization round-trip through `serializeProject`/`deserializeProject` with graph preserved.
+  - Selectors exported from `studio/src/stores/graph.selectors.ts` (`topoSort`, `getEdges`, `canConnect`) and behave as expected.
+- Benchmarks: `studio/src/stores/graph.bench.test.ts` executes the 1k mixed-op suite; set thresholds (apply/undo/redo ≤ 2.5s); stub autosave to avoid I/O skew.
+- Equality policy: a small test asserts history frames advance only when `graph.revision` increments; UI-only edits do not increment revision and therefore do not produce frames.
+
+
+# Subtasks:
+## 1. Review existing Zustand store patterns [pending]
+### Dependencies: None
+### Description: Inspect current store implementations to capture structure and conventions.
+### Details:
+Read `studio/src/stores/project.ts`, `studio/src/stores/device.ts`, and `studio/src/stores/timeline.ts` to catalog `devtools`/`immer` composition, `temporal` wiring, the `markDirty`/`touch` autosave helper, and how selectors/exports like `serializeProject` and `undo` are surfaced for consumers.
+
+## 2. Define graph state contract [pending]
+### Dependencies: 1.1
+### Description: Design types and selectors for the new graph store slice.
+### Details:
+Draft the NodeKind union, GraphNode interfaces, graph metadata, and selectors mirroring the naming used in `project.ts`. Summarize trade-offs between `zundo`'s `temporal` middleware and a custom temporal helper (see `docs/research/PRISM_Studio_Architecture_Research.md`) and decide which undo/redo surface the store will expose alongside serialization helpers.
+
+## 3. Implement graph store with undo support [pending]
+### Dependencies: 1.2
+### Description: Build the Zustand store using immer and zundo hooks.
+### Details:
+Create `studio/src/stores/graph.ts` implementing the agreed contract, composing `devtools`, `immer`, and the chosen temporal middleware for undo/redo/history configuration. Implement actions (`addNode`, `updateNodeParams`, `connectPins`, `removeNode`, `setOutputGeometry`), wire selectors, and ensure each mutation invokes `useProjectStore.getState().touch()` so autosave reuse matches the `markDirty` pattern in `project.ts`. Export undo/redo helpers consistent with other stores.
+
+## 4. Extend project schema and defaults [pending]
+### Dependencies: 1.3
+### Description: Wire graph state into persistence and migrations.
+### Details:
+Update `studio/src/lib/projectSchema.ts` to add the graph shape and migration defaults, seed `createEmptyProject` with a Solid → ToK1 starter graph, and ensure `serializeProject`/`deserializeProject` in `studio/src/stores/project.ts` handle the new field while tolerating payloads without `graph`. Keep migrations backward compatible.
+
+## 5. Author graph store Vitest coverage [pending]
+### Dependencies: 1.3, 1.4
+### Description: Add unit tests verifying store behaviors and serialization.
+### Details:
+Create `studio/src/stores/graph.test.ts` covering default state seeding, CRUD flows, pin connection validation, undo/redo via the chosen temporal API, and serialization round-trips through `serializeProject`/`deserializeProject`. Mirror `project.test.ts` and `device.test.ts` patterns to reset store state and spy on the project store `touch` helper.
+
+## 6. Smoke-test project autosave integration [pending]
+### Dependencies: 1.4, 1.5
+### Description: Verify graph changes persist and autosave triggers correctly.
+### Details:
+Use the graph store actions to mutate nodes and confirm `useProjectStore.getState().touch()` fires, driving the autosave throttle from `project.ts` while persisting graph data via `serializeProject`/`deserializeProject`. Validate persistence by saving/loading a project and confirming the graph state survives reloads.
+
+## 7. Add NodeDefinitions and connect/param validation [pending]
+### Dependencies: 1.3
+### Description: Define NodeDefinitions per NodeKind and enforce validation in graph actions.
+### Details:
+Create `studio/src/lib/graph/nodeDefinitions.ts` with per-`NodeKind` specs (input pins with arity and param keys/types/ranges). Update `connectPins` and `updateNodeParams` in `studio/src/stores/graph.ts` to enforce definitions and emit error codes via thrown `Error`: `NODE_NOT_FOUND`, `PIN_NOT_FOUND`, `TYPE_INVALID`, `RANGE_INVALID`, `CYCLE`. Ensure `removeNode` cleans inbound references. Update tests accordingly in `studio/src/stores/graph.test.ts`.
+
+## 8. Add graph selectors and temporal equality policy [pending]
+### Dependencies: 1.3
+### Description: Provide standalone selectors and switch temporal equality to revision-based, with a history batching helper.
+### Details:
+Add `studio/src/stores/graph.selectors.ts` exporting `topoSort`, `getEdges`, and `canConnect` (using NodeDefinitions). Update `studio/src/stores/graph.ts` to use revision-based temporal equality and export `withHistoryBatch` plus direct `pause/resume` from temporal for gesture grouping. Document policy in code comments and ensure UI-only actions remain excluded from history.
+

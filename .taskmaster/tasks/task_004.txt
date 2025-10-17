@@ -1,0 +1,58 @@
+# Task ID: 4
+# Title: Add OKLCH Palette LUT Generation
+# Status: pending
+# Dependencies: 1, 3
+# Priority: high
+# Description: Bake 256×RGB OKLCH lookup tables on the host per PRD color requirements, adding gamut handling modes, gamma policy coordination, and a memoized LUT cache with perf benchmarks.
+# Details:
+- Add culori@^4 to `studio/package.json` and implement `studio/src/lib/color/oklchLut.ts` (new) to: (1) convert project palettes (see `studio/src/lib/projectSchema.ts` Palette) to OKLCH, (2) interpolate to 256 entries, (3) apply sRGB encoding per policy, and (4) return LUT bytes (Uint8Array RGB ×256) plus metadata.
+- API shape (typescript): `generateOklchLut(palette: string[], options?: { steps?: number; gamma?: number; gammaPolicy?: 'baked_2_2'|'flat_1_0'; gamutMode?: 'clip'|'compress'|'preserve-hue'; onStats?: (s:{fromCache:boolean; genMs:number})=>void }): { bytes: Uint8Array; meta: { steps:number; gamutMode:string; gammaPolicy:string; paletteHash:string } }`.
+- Gamut strategies in helper: `clip` (truncate out-of-gamut), `compress` (reduce chroma to fit, preserve L/H), and `preserve-hue` (hue-preserving compression along constant-H lines). Validate using synthetic high-L/high-C palettes.
+- Gamma policy coordination: default bake sRGB ≈2.2 into LUT bytes with device gamma set to 1.0; provide alternative policy `flat_1_0` (no bake) so device gamma applies, to avoid double-encoding. Expose via `gammaPolicy` option and thread through node integration (PaletteMap/HueShift/Brightness) in subtask 3.
+- Add an in-module memoized cache keyed by `paletteHash` + relevant options (steps, gammaPolicy, gamutMode). Expose lightweight stats via `onStats` callback and/or simple getter; log with `studio/src/lib/logger.ts` where appropriate.
+- File placement and conventions align with current project structure: TypeScript modules under `studio/src/lib`, vitest tests beside modules (e.g., `oklchLut.test.ts`), leveraging setup in `studio/src/test/setup.ts`. Node integration leverages forthcoming color nodes and respects existing UI flows in `studio/src/features/devices/DevicePanel.tsx` (for gamma controls in later tasks).
+
+# Test Strategy:
+- Utility tests in `studio/src/lib/color/oklchLut.test.ts` validate: (1) output length 256, (2) endpoints match input palette bounds (within rounding), (3) gamma mapping correctness for `baked_2_2` vs `flat_1_0`, and (4) metadata fields populated.
+- Node integration tests (once nodes consume the helper) extend existing suites to ensure PaletteMap uses LUT indices correctly and the final RGB buffer matches expectations for both gamma policies.
+- Gamut strategy tests with synthetic palettes assert: no NaNs, out-of-gamut handling per mode, and hue preservation within tolerance (e.g., Δh ≤ 1–2° for preserve-hue).
+- Cache/perf tests: measure first-call vs cached-call timings and assert a perf guard on dev HW (<2 ms for cached path; relaxed threshold under `process.env.CI`). Verify cache hit rates are observable via stats hook.
+- Documentation check: verify gamma policy section added to `docs/user-manual.md` or a new `docs/bench/oklch.md` notes CI thresholds and measurement method.
+
+# Subtasks:
+## 1. Install culori and scaffold OKLCH LUT module [pending]
+### Dependencies: None
+### Description: Add the culori package and create the initial OKLCH LUT helper file.
+### Details:
+Add `culori@^4` to `studio/package.json`, install deps, and create `studio/src/lib/color/oklchLut.ts` with exported placeholders for LUT generation, metadata typing, and options (`gammaPolicy`, `gamutMode`, `steps`, `onStats`).
+
+## 2. Implement OKLCH LUT generation pipeline [pending]
+### Dependencies: 4.1
+### Description: Fill the helper with full conversion, interpolation, and gamma logic.
+### Details:
+Implement in `studio/src/lib/color/oklchLut.ts`: parse hex palette → OKLCH via culori, interpolate to 256 entries, apply sRGB encoding per `gammaPolicy` (`baked_2_2` default), and emit `{ bytes, meta }` including `paletteHash`, `steps`, `gamutMode`, `gammaPolicy`.
+
+## 3. Integrate LUT helper into color nodes and tests [pending]
+### Dependencies: 4.2
+### Description: Update color nodes to consume the new LUT helper and validate behavior.
+### Details:
+Refactor PaletteMap, HueShift, and Brightness evaluators to call the helper and pass through options (`gammaPolicy`, `gamutMode`). Evaluator should emit indexed palette references and final RGB buffer for packaging without changing external APIs.
+
+## 4. Implement gamut handling strategies and tests [pending]
+### Dependencies: 4.2
+### Description: Add clip/compress/preserve-hue gamut modes to the LUT helper and validate behavior.
+### Details:
+Extend `studio/src/lib/color/oklchLut.ts` options with `gamutMode: 'clip'|'compress'|'preserve-hue'`. Implement: clip (truncate to sRGB), compress (reduce chroma to fit while preserving L/H as much as possible), preserve-hue (hue-preserving compression along constant-H lines). Validate using synthetic stress palettes (high C, high L).
+
+## 5. Define gamma policy and device coordination [pending]
+### Dependencies: 4.3
+### Description: Decide and document gamma policy; plumb configuration through nodes to avoid double-encoding.
+### Details:
+Adopt default policy: bake sRGB ≈2.2 into LUT bytes (`gammaPolicy='baked_2_2'`) and set device gamma to 1.0. Document alternative `flat_1_0` (no bake, device gamma applies). Add a config flag in the LUT options and ensure node integrations from subtask 3 forward the chosen policy. Document policy and trade-offs in `docs/user-manual.md` (Color/Gamma) including examples and when to use each.
+
+## 6. Add paletteHash cache and LUT performance benchmarks [pending]
+### Dependencies: 4.2
+### Description: Memoize LUT results and add perf guard; expose stats for observability.
+### Details:
+Implement a memoized cache in `oklchLut.ts` keyed by `paletteHash` + critical options (`steps`,`gammaPolicy`,`gamutMode`). Provide `onStats` callback for cache hit/miss and generation timing; optionally a simple `getCacheStats()` for tests. Add vitest perf tests that assert cached path completes under 2 ms on dev hardware and document relaxed CI thresholds in `docs/bench/oklch.md`.
+

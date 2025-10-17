@@ -1,0 +1,57 @@
+# Task ID: 2
+# Title: Build Visual Node Graph Editor
+# Status: pending
+# Dependencies: 1
+# Priority: medium
+# Description: Implement a React authoring surface for creating and wiring the tiny node set.
+# Details:
+Add `studio/src/features/graph/GraphCanvas.tsx` and supporting components that render draggable node cards inside an SVG/canvas layer, styled with existing design tokens. Bind to the graph store for node lists and connections, showing typed input/output ports per node definition. Support gestures: drag to move, click toolbar to add node, drag from port to port to connect (validating fan-in/out rules), delete via keyboard. Provide accessible labels and integrate with undo/redo by calling store actions. Update `App.tsx` to mount the graph editor above the DevicePanel so authoring precedes bake/upload. Additionally, implement a dedicated DPR-aware canvas grid/edges layer leveraging `setupDprCanvas` and `resizeIfNeeded` from `studio/src/lib/canvas.ts` and an rAF loop patterned after `studio/src/features/timeline/TimelineCanvas.tsx`, including scroll-blit and dirty-region redraw similar to `maybeRebuildStatic`. Draw edges from graph store selectors (once the graph slice exists per Task 1) and clamp zoom to sane bounds. Add world pan/zoom transform, rubber-band selection, and hit-testing computed in transformed screen space with keyboard selection parity.
+Wireframe refs: Timeline Editor screen in 'User-Facing App Wireframes 3/src/components/prism/TimelineEditorScreen.tsx' and App.tsx:Timeline; docs in PRODUCTION_READY_SUMMARY.md and WIRED_FUNCTIONALITY.md (Timeline zoom/scrub).
+
+Acceptance Checklist (wireframe parity)
+- [ ] Timeline zoom matches wireframe states (in/out extremes)
+- [ ] Scrubbing behavior & playhead visuals match wireframe
+- [ ] Keyboard focus order/tab stops per wireframe; ports tabbable
+- [ ] Canvas edges redraw correctly after pan/zoom (100 nodes/200 edges)
+
+# Test Strategy:
+Use @testing-library/react and Vitest to simulate adding nodes, wiring them, and verifying DOM reflects store state; add Cypress/Playwright smoke test ensuring nodes persist after reload via project autosave. Extend with a performance harness asserting average draw/frame time ≤16.7ms while panning at ~100 nodes/200 edges, and accessibility tests validating focus management, tabbable ports, and Enter/Space activation (reuse Playwright config at `studio/playwright.config.ts`).
+Visual parity: zoom states and scrubbing match wireframe; keyboard focus order mirrors wireframe interactions.
+
+# Subtasks:
+## 1. Scaffold GraphCanvas and node card layout [pending]
+### Dependencies: None
+### Description: Create the GraphCanvas surface and supporting node card components within the graph feature.
+### Details:
+Add GraphCanvas.tsx and child components that render nodes inside an SVG/canvas layer using existing design tokens and pull node data from the graph store.
+
+## 2. Implement node gestures and connection wiring [pending]
+### Dependencies: 2.1
+### Description: Enable core authoring gestures for moving nodes, adding new nodes, and wiring ports with validation.
+### Details:
+Wire drag handlers for node repositioning, toolbar actions for adding nodes, and port-to-port drag interactions that enforce fan-in/out rules and update the graph store.
+
+## 3. Integrate accessibility, undo/redo, and App mounting [pending]
+### Dependencies: 2.1, 2.2
+### Description: Finalize editor integration with accessibility affordances and application shell embedding.
+### Details:
+Provide ARIA labels, keyboard delete handling, undo/redo hookups via store actions, and mount the editor in App.tsx above the DevicePanel per layout requirements.
+
+## 4. Implement Canvas grid/edges layer with DPR + dirty-region redraw [pending]
+### Dependencies: 2.1
+### Description: Add a DPR-aware canvas-backed grid/edges layer to GraphCanvas with scroll-blit and partial redraw.
+### Details:
+Create a dedicated 2D canvas inside GraphCanvas using `setupDprCanvas` and `resizeIfNeeded` from `studio/src/lib/canvas.ts`. Drive rendering via an rAF loop following `studio/src/features/timeline/TimelineCanvas.tsx` (see `useRaf`, offscreen buffer, and `maybeRebuildStatic`-style scroll-blit). Render: (1) static grid lines to an offscreen buffer, (2) edges from graph selectors (e.g., `useGraphStore`-derived connections) onto the onscreen layer. On pan: blit the buffer and redraw only newly exposed strips; on zoom: rebuild the buffer. Clamp zoom to configured min/max to avoid numerical drift. Ensure edges reproject correctly under the world transform.
+
+## 5. Add pan/zoom + selection rectangle + hit-testing at scale [pending]
+### Dependencies: 2.1, 2.4
+### Description: Implement world transform (pan/zoom), rubber-band selection, and accurate hit-testing under transforms.
+### Details:
+Track `panX/panY/zoom` as a world transform applied to canvas draw and DOM overlay. Implement wheel zoom with clamped bounds and pointer-drag panning similar to TimelineCanvas interactions. Add a rubber-band selection rectangle overlay (DOM/SVG) that maps screen→world using the inverse transform. Compute hit-tests for nodes/ports using transformed bounds (Path2D or AABB in world space) and ensure keyboard selection (arrow keys, Shift+click/Space/Enter) mirrors pointer semantics.
+
+## 6. Performance and accessibility tests (60 FPS & WCAG) [pending]
+### Dependencies: 2.2, 2.4
+### Description: Add automated performance and a11y coverage for the graph editor.
+### Details:
+Introduce a perf harness that measures draw time while panning at scale (≈100 nodes/200 edges), validating average frame time ≤16.7ms. Add React Testing Library specs for focus order, roving tabindex (if used), and keyboard activation of ports/nodes (Enter/Space). Ensure ARIA roles/labels on the canvas/editor (patterned after `TimelineCanvas` role/label) and tabbable interactive ports.
+

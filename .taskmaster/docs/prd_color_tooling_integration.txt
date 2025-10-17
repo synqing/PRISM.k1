@@ -1,0 +1,288 @@
+<rpg-method>
+# PRISM K1: Color Tooling Integration PRD (RPG)
+
+Purpose: Add developer‑side color/show authoring utilities that improve preset quality and speed while staying firmware‑agnostic. Focus on:
+- Pyramid Triangles shows (export as PRISM payloads)
+- HSLuv palette support (better perceptual gradients)
+- Preview tooling using ansi/HTML (colr, ansi2html/aha)
+
+</rpg-method>
+
+<overview>
+## Problem Statement
+Creating high‑quality presets/patterns today is manual and RGB‑centric. Authoring nuanced color ramps in RGB leads to banding, and we lack a fast path to generate frame sequences from proven LED show logic. We also need easy previews for docs/soak without hardware.
+
+## Target Users
+- Firmware/dev tools engineers creating presets/patterns
+- QA/demos needing quick previews without devices
+- Future RGBW SKU exploration
+
+## Success Metrics
+- 10+ new presets authored via tools within 1 day
+- Perceptual gradients (no visible banding) for demo palettes
+- Zero firmware changes required to adopt new presets
+
+</overview>
+
+<functional-decomposition>
+## Capability Tree
+
+### Capability: Palette Authoring & Conversion
+Tools to define color palettes and generate per‑LED payloads.
+
+#### Feature: HSLuv interpolation support
+- **Description**: Add HSLuv space for perceptually uniform ramps
+- **Inputs**: HEX list, LED count, space=hsluv
+- **Outputs**: RGB arrays (and optional RGBW)
+- **Behavior**: Convert HEX→HSLuv; interpolate with hue wrap; convert to RGB
+
+#### Feature: HSV/HSL interpolation (baseline)
+- **Description**: Support HSV/HSL spaces (existing HSV, add HSL shim)
+- **Inputs**: HEX list, space= hsv|hsl
+- **Outputs**: RGB arrays (optional RGBW)
+- **Behavior**: Existing HSV; HSL via standard conversions
+
+#### Feature: RGBW emission (authoring‑only)
+- **Description**: Compute RGBW tuples for offline pipelines
+- **Inputs**: RGB arrays
+- **Outputs**: RGBW arrays
+- **Behavior**: Use rgbw_colorspace_converter HSI→RGBW mapping
+
+#### Feature: Artifact export formats
+- **Description**: Emit JSON and CSV payloads + metadata
+- **Inputs**: Generation spec
+- **Outputs**: JSON/CSV files under out/
+- **Behavior**: Deterministic output; include meta for reproducibility
+
+### Capability: Show Generation (PyramidTriangles‑inspired)
+Generate time‑varying frames from proven LED show logic, exported as PRISM assets.
+
+#### Feature: Minimal show engine (offline)
+- **Description**: Implement 2–3 reference shows (e.g., sine waves, morphing gradients)
+- **Inputs**: LED count, duration/fps, parameters
+- **Outputs**: Sequences of RGB frames (JSON/CSV; future .prism)
+- **Behavior**: CPU‑side generation; no device deps
+
+#### Feature: Parametric control
+- **Description**: Expose show knobs (speed, amplitude, palette)
+- **Inputs**: CLI flags/JSON spec
+- **Outputs**: Parameterized artifact metadata
+- **Behavior**: Validate ranges; reproducible seeds
+
+#### Feature: (Future) .prism v1.1 packaging
+- **Description**: Package sequences as .prism (header + CRC per v1.1)
+- **Inputs**: Frames, meta
+- **Outputs**: .prism file
+- **Behavior**: Use firmware header spec; compute CRC; size cap checks
+
+### Capability: Previews (Terminal/HTML)
+Preview palettes and shows without hardware for quick iteration/demos.
+
+#### Feature: Terminal preview (colr)
+- **Description**: Render palette/show rows in terminal using ANSI color blocks
+- **Inputs**: RGB arrays
+- **Outputs**: Terminal output
+- **Behavior**: Downsample; time‑based playback for shows
+
+#### Feature: HTML preview (ansi2html/aha)
+- **Description**: Export HTML preview of palette/show playback
+- **Inputs**: ANSI stream
+- **Outputs**: HTML file
+- **Behavior**: Pipe ANSI → HTML for embeddable docs
+
+</functional-decomposition>
+
+<structural-decomposition>
+## Repository Structure
+
+```
+tools/
+├── palette_to_prism.py         # Palette authoring (HSV/HSL + HSLuv)
+├── show_to_prism.py            # (New) Show generator exporting frames
+├── previews/                   # (New) Preview helpers
+│   ├── terminal_preview.py     # colr‑based terminal playback
+│   └── html_preview.py         # ansi→HTML via ansi2html/aha
+├── requirements.txt            # Add rgbw_colorspace_converter, hsluv
+└── README.md                   # Usage docs
+```
+
+## Module Definitions
+
+### Module: palette_to_prism
+- **Maps to capability**: Palette Authoring & Conversion
+- **Responsibility**: Accept palette stops, interpolate in chosen space, emit RGB/RGBW
+- **Exports (CLI)**:
+  - `--palette <hex,...> --led-count N --space hsv|hsl|hsluv --include-rgbw --output <json> [--csv <csv>]`
+
+### Module: show_to_prism
+- **Maps to capability**: Show Generation
+- **Responsibility**: Generate frames for a small set of shows
+- **Exports (CLI)**:
+  - `--show sine|morph --duration <s> --fps <n> --led-count N --palette <hex,...> --output <json>`
+
+### Module: previews
+- **Maps to capability**: Previews
+- **Responsibility**: Terminal and HTML preview helpers used by the above CLIs
+- **Exports (library)**:
+  - `render_terminal(rgb_frames, fps)`
+  - `render_html(rgb_frames, fps, out_html)`
+
+</structural-decomposition>
+
+<dependency-graph>
+## Dependency Chain
+
+### Foundation (Phase 0)
+- **tooling-core**: CLI scaffolding, JSON/CSV writers (no deps)
+- **color-libs**: rgbw_colorspace_converter, hsluv (no deps)
+
+### Palette Layer (Phase 1)
+- **palette-hsluv**: Depends on [tooling-core, color-libs]
+- **palette-rgbw**: Depends on [palette-hsluv]
+
+### Preview Layer (Phase 2)
+- **terminal-preview**: Depends on [palette-hsluv]
+- **html-preview**: Depends on [terminal-preview]
+
+### Shows Layer (Phase 3)
+- **shows-minimal**: Depends on [palette-hsluv]
+- **shows-params**: Depends on [shows-minimal]
+
+### Packaging (Phase 4)
+- **prism-packaging** (future): Depends on [shows-params]
+
+</dependency-graph>
+
+<implementation-roadmap>
+## Development Phases
+
+### Phase 0: Foundation
+**Goal**: Establish CLI scaffolding + dependencies
+**Entry Criteria**: None
+**Tasks**:
+- [ ] tooling-core (depends on: none)
+  - Acceptance: Shared JSON/CSV writer; argparse patterns in place
+  - Tests: Unit tests for writers; CLI smoke
+- [ ] color-libs (depends on: none)
+  - Acceptance: requirements.txt includes hsluv + rgbw converter; import succeeds
+  - Tests: Import tests
+**Exit Criteria**: Both CLIs can parse args and write stub outputs
+
+### Phase 1: Palette Authoring
+**Goal**: High‑quality palette generation with RGB/RGBW
+**Entry**: Phase 0 complete
+**Tasks**:
+- [ ] palette-hsluv (depends on: tooling-core, color-libs)
+  - Acceptance: --space hsluv creates smooth ramps; meta captured
+  - Tests: Golden outputs for sample palettes; wrap‑around hues
+- [ ] palette-rgbw (depends on: palette-hsluv)
+  - Acceptance: --include-rgbw emits RGBW arrays; shape and ranges valid
+  - Tests: Property tests for ranges; sample correctness
+**Exit**: New presets authored and exported
+
+### Phase 2: Previews
+**Goal**: Quick palette/show previews without hardware
+**Entry**: Phase 1 complete
+**Tasks**:
+- [ ] terminal-preview (depends on: palette-hsluv)
+  - Acceptance: Preview renders in terminal; fps respected
+  - Tests: Dry‑run output shape; fps timing tolerance
+- [ ] html-preview (depends on: terminal-preview)
+  - Acceptance: HTML generated from ANSI stream; loads in browser
+  - Tests: File generation; minimal HTML validation
+**Exit**: Previews used in docs/demos
+
+### Phase 3: Shows (Minimal)
+**Goal**: Generate a couple of reference shows offline
+**Entry**: Phase 1 complete
+**Tasks**:
+- [ ] shows-minimal (depends on: palette-hsluv)
+  - Acceptance: sine|morph show frames with palette mapping
+  - Tests: Deterministic frames for seeded params
+- [ ] shows-params (depends on: shows-minimal)
+  - Acceptance: CLI flags validated; meta recorded
+  - Tests: Param validation; reproducibility
+**Exit**: Exportable frame sequences for presets
+
+### Phase 4: Packaging (Future)
+**Goal**: Emit .prism v1.1 assets
+**Entry**: Phase 3 complete
+**Tasks**:
+- [ ] prism-packaging (depends on: shows-params)
+  - Acceptance: Valid header + CRC; size caps
+  - Tests: Parse via firmware parser; CRC match
+**Exit**: Ready‑to‑flash assets
+
+</implementation-roadmap>
+
+<test-strategy>
+## Scope
+- Unit tests for color conversions and interpolation (hsluv/hsv)
+- Golden JSON/CSV artifacts checked into tests/data (small sizes)
+- CLI smoke tests for help/arg parsing
+
+## Scenarios
+**Happy paths**:
+- 2‑stop and 3‑stop palettes produce expected ramps
+- RGBW output within [0,255] and 4‑tuple per LED
+
+**Edge cases**:
+- Hue wrap across 0/360 (e.g., #ff0000 → #ff00ff)
+- LED counts not divisible by segments
+
+**Integration**:
+- End‑to‑end: palette → preview → JSON
+- (Future) show → .prism → firmware parser
+
+</test-strategy>
+
+<architecture>
+## System Components
+- Python CLI tools in tools/
+- Third‑party: rgbw_colorspace_converter, hsluv, colr, ansi2html/aha
+
+## Data Models
+- JSON: { rgb: [[r,g,b]..], rgbw?: [[r,g,b,w]..], meta: {...} }
+- CSV: r,g,b[,w]
+
+## Tech Decisions
+**Decision: HSLuv for palette ramps**
+- **Rationale**: Better perceptual uniformity than HSV/HSL
+- **Trade‑offs**: Slightly slower; dependency added
+- **Alternatives**: OKLab/OKLCH (future)
+
+</architecture>
+
+<risks>
+## Technical Risks
+**Risk**: Color accuracy of RGBW mapping
+- **Impact**: Medium
+- **Likelihood**: Medium
+- **Mitigation**: Keep RGBW authoring‑only; calibrate if we pursue RGBW hardware
+
+**Risk**: Preview fidelity vs actual LEDs
+- **Mitigation**: Note in docs; provide device photos later
+
+## Dependency Risks
+- Upstream packages version drift → pin versions in requirements
+
+## Scope Risks
+- Show surface can balloon → keep 2–3 shows, defer others
+
+</risks>
+
+<appendix>
+## References
+- Pyramid Triangles: https://github.com/iamh2o/pyramidtriangles
+- HSLuv: https://www.hsluv.org/
+- rgbw_colorspace_converter: https://github.com/synqing/rgbw_colorspace_converter
+- ansi2html: https://github.com/pycontribs/ansi2html
+- aha: https://github.com/theZiz/aha
+- colr: https://github.com/welbornprod/colr
+
+## Open Questions
+- Which show algorithms deliver most value first?
+- Do we want OKLab/OKLCH next?
+
+</appendix>
+

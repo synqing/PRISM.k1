@@ -3,6 +3,11 @@ import { invoke } from '@tauri-apps/api/core';
 import * as fs from '@tauri-apps/plugin-fs';
 import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
 import { log } from '../../lib/logger';
+import ProgressPanel from './ProgressPanel';
+import { useUploadStore } from '../../stores/upload';
+import { mapUploadError } from '../../lib/uploadErrors';
+import { PRESETS } from '../../lib/presets';
+import { useProjectStore } from '../../stores/project';
 
 type DeviceInfo = {
   name: string;
@@ -39,6 +44,34 @@ export default function DevicePanel() {
   const w: any = typeof window !== 'undefined' ? window : {};
   const forceFake = !!w.__E2E_FORCE_FAKE__;
   const hasTauri = !!w.__TAURI_INTERNALS__;
+  const upload = useUploadStore();
+  React.useEffect(() => {
+    if (upload.phase === 'cancelled') {
+      addToast('Upload cancelled', 'error');
+    }
+  }, [upload.phase]);
+
+  React.useEffect(() => {
+    if (upload.phase === 'done') {
+      const startedAt = upload.startedAt;
+      const finishedAt = upload.finishedAt;
+      const ttflMs = startedAt && finishedAt ? (finishedAt - startedAt) : undefined;
+      const palette = paletteStr.split(',').map(s => s.trim()).filter(Boolean);
+      const totalSize = upload.totalBytes || 0;
+      const payloadSize = Math.max(0, totalSize - 64 - Math.min(16, palette.length) * 4);
+      useProjectStore.getState().setLastBake({
+        fps,
+        ledCount: 320,
+        frames: Math.max(1, Math.round(seconds * fps)),
+        payloadSize,
+        totalSize,
+        ttflMs,
+        startedAt: startedAt ?? null,
+        finishedAt: finishedAt ?? null,
+        throughputBps: upload.bytesPerSec,
+      });
+    }
+  }, [upload.phase]);
 
   const scan = async () => {
     setLoading(true);
@@ -186,6 +219,23 @@ export default function DevicePanel() {
     };
   }, [ctx.open]);
 
+  // Keyboard shortcuts: mod+P (play), mod+S (stop)
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      if (e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        if (active) { invoke('device_control_play', { host: active.host, name: 'baked' }).catch(()=>{}); }
+      } else if (e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (active) { invoke('device_control_stop', { host: active.host }).catch(()=>{}); }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active]);
+
   const revealExported = async (id: string) => {
     const p = exported[id];
     if (!p) { addToast('Reveal available after export', 'error'); return; }
@@ -254,6 +304,33 @@ export default function DevicePanel() {
   const healthColor = netHealth === 'good' ? '#2ecc71' : netHealth === 'ok' ? '#f1c40f' : netHealth === 'poor' ? '#e74c3c' : '#7f8c8d';
   const [confirm, setConfirm] = React.useState<{ msg: string; onConfirm: () => Promise<void> } | null>(null);
   const confirmSticky = confirm || (collision ? { msg: `File exists: ${collision.path}. Overwrite or Auto‑Suffix?`, onConfirm: async () => {} } : null);
+  // Bake UI controls
+  const [seconds, setSeconds] = React.useState<number>(1);
+  const [fps, setFps] = React.useState<number>(120);
+  const [color, setColor] = React.useState<string>('#1ec8ff');
+  const [paletteStr, setPaletteStr] = React.useState<string>('#ff6b35,#f7931e,#fdc830,#f37335');
+  // Node controls
+  const [useGradient, setUseGradient] = React.useState<boolean>(false);
+  const [gradC0, setGradC0] = React.useState<string>('#000000');
+  const [gradC1, setGradC1] = React.useState<string>('#ffffff');
+  const [gradSpeed, setGradSpeed] = React.useState<number>(0.25);
+  const [useHueShift, setUseHueShift] = React.useState<boolean>(false);
+  const [hueDeg, setHueDeg] = React.useState<number>(0);
+  const [hueRate, setHueRate] = React.useState<number>(30);
+  // Playback controls
+  const [brightness, setBrightness] = React.useState<number>(255);
+  const [gammaX100, setGammaX100] = React.useState<number>(220);
+  const rampTimer = React.useRef<any>(null);
+  const sendBrightness = React.useCallback(async (val: number) => {
+    if (!active) return; try { await invoke('device_control_brightness', { host: active.host, target: Math.max(0, Math.min(255, Math.round(val))), durationMs: 150 }); } catch {}
+  }, [active]);
+  const sendGamma = React.useCallback(async (val: number) => {
+    if (!active) return; try { await invoke('device_control_gamma', { host: active.host, gammaX100: Math.max(50, Math.min(500, Math.round(val))), durationMs: 150 }); } catch {}
+  }, [active]);
+  const throttledSend = (kind: 'b'|'g', val: number) => {
+    if (rampTimer.current) clearTimeout(rampTimer.current);
+    rampTimer.current = setTimeout(() => { kind==='b' ? sendBrightness(val) : sendGamma(val); }, 150);
+  };
 
   const handleCollisionAction = async (action: 'overwrite' | 'suffix' | 'cancel') => {
     if (!collision) return;
@@ -351,9 +428,113 @@ export default function DevicePanel() {
           {patterns.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <h4 style={{ margin: '8px 0' }}>Patterns</h4>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {PRESETS.map((p) => (
+                  <button key={p.name} onClick={() => {
+                    setSeconds(p.seconds); setFps(p.fps); setColor(p.color); setPaletteStr(p.palette.join(','));
+                    setUseGradient(!!p.useGradient);
+                    if (p.useGradient && p.grad) { setGradC0(p.grad.c0); setGradC1(p.grad.c1); setGradSpeed(p.grad.speed); }
+                    setUseHueShift(!!p.useHueShift);
+                    if (p.useHueShift && p.hue) { setHueDeg(p.hue.deg); setHueRate(p.hue.rate); }
+                    if (active) {
+                      try {
+                        const v = { seconds: p.seconds, fps: p.fps, color: p.color, paletteStr: p.palette.join(','), useGradient: !!p.useGradient, grad: p.grad || null, useHueShift: !!p.useHueShift, hue: p.hue || null };
+                        localStorage.setItem(`prism.preset.${active.host}`, JSON.stringify(v));
+                      } catch {}
+                    }
+                  }}>{p.name}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <button onClick={() => active ? listPatterns(active) : undefined}>Refresh</button>
                 <button onClick={() => active ? deleteAll(active) : undefined} disabled={!active || connectState[active.host] !== 'CONNECTED'}>Delete All</button>
+                {/* Bake & Upload with controls */}
+                <button disabled={!active || upload.phase === 'stream' || upload.phase === 'finalizing' || upload.phase === 'cancelled'} onClick={async () => {
+                  if (!active) { addToast('No device', 'error'); return; }
+                  try {
+                    const { invoke } = await import('@tauri-apps/api/core');
+                    // Bake N frames + pack, then upload
+                    const { bakeProjectToPrism } = await import('../../lib/bake/bake');
+                    const palette = paletteStr.split(',').map(s => s.trim()).filter(Boolean);
+                    // Build a simple graph based on node controls
+                    const nodes: any = {};
+                    if (useGradient) {
+                      nodes['grad'] = { id: 'grad', kind: 'Gradient', params: { c0: gradC0, c1: gradC1, speed: gradSpeed }, inputs: {} };
+                    } else {
+                      nodes['solid'] = { id: 'solid', kind: 'Solid', params: { color }, inputs: {} };
+                    }
+                    let lastId = useGradient ? 'grad' : 'solid';
+                    if (useHueShift) {
+                      nodes['hue'] = { id: 'hue', kind: 'HueShift', params: { deg: hueDeg, rate: hueRate }, inputs: { src: lastId } };
+                      lastId = 'hue';
+                    }
+                    // PaletteMap optional (if palette provided)
+                    const usePalette = palette.length > 0;
+                    if (usePalette) {
+                      nodes['pal'] = { id: 'pal', kind: 'PaletteMap', params: {}, inputs: { src: lastId } };
+                      lastId = 'pal';
+                    }
+                    nodes['out'] = { id: 'out', kind: 'ToK1', params: {}, inputs: { src: lastId } };
+                    const order = Object.keys(nodes);
+                    const graph = { nodes, order, ledCount: 320 };
+                    const { bytes } = await bakeProjectToPrism(graph as any, seconds, fps, 320, palette);
+                    await invoke('device_upload', { host: active.host, name: 'baked', bytes: Array.from(bytes) });
+                    // Auto-PLAY the uploaded pattern id
+                    try { await invoke('device_control_play', { host: active.host, name: 'baked' }); } catch {}
+                    addToast(`Bake & Upload started (${seconds}s @${fps} FPS)`, 'info');
+                  } catch (e:any) { addToast(mapUploadError(String(e)), 'error'); }
+                }}>Bake & Upload</button>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>Sec
+                  <input type="number" min={0.1} step={0.1} value={seconds} onChange={e => setSeconds(Math.max(0.1, parseFloat(e.target.value)||1))} style={{ width: 64, marginLeft: 4 }} />
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>FPS
+                  <input type="number" min={1} step={1} value={fps} onChange={e => { setFps(Math.max(1, parseInt(e.target.value)||120)); if (upload.phase==='cancelled') upload.reset(); }} style={{ width: 64, marginLeft: 4 }} />
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>Color
+                  <input type="color" value={color} onChange={e => { setColor(e.target.value); if (upload.phase==='cancelled') upload.reset(); }} style={{ marginLeft: 4 }} />
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9, display: 'flex', alignItems: 'center' }}>Palette
+                  <input type="text" value={paletteStr} onChange={e => { setPaletteStr(e.target.value); if (upload.phase==='cancelled') upload.reset(); }} placeholder="#ff0000,#00ff00" style={{ width: 240, marginLeft: 4 }} />
+                </label>
+                <label style={{ fontSize: 12, opacity: 0.9 }}>
+                  <input type="checkbox" checked={useGradient} onChange={e => { setUseGradient(e.target.checked); if (upload.phase==='cancelled') upload.reset(); }} /> Gradient
+                </label>
+                {useGradient && (
+                  <>
+                    <label style={{ fontSize: 12, opacity: 0.9 }}>C0
+                      <input type="color" value={gradC0} onChange={e => setGradC0(e.target.value)} style={{ marginLeft: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, opacity: 0.9 }}>C1
+                      <input type="color" value={gradC1} onChange={e => setGradC1(e.target.value)} style={{ marginLeft: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, opacity: 0.9 }}>Speed
+                      <input type="number" min={-5} step={0.05} value={gradSpeed} onChange={e => setGradSpeed(parseFloat(e.target.value)||0)} style={{ width: 80, marginLeft: 4 }} />
+                    </label>
+                  </>
+                )}
+                <label style={{ fontSize: 12, opacity: 0.9 }}>
+                  <input type="checkbox" checked={useHueShift} onChange={e => setUseHueShift(e.target.checked)} /> Hue Shift
+                </label>
+                {useHueShift && (
+                  <>
+                    <label style={{ fontSize: 12, opacity: 0.9 }}>Deg
+                      <input type="number" min={-180} max={180} step={1} value={hueDeg} onChange={e => setHueDeg(parseFloat(e.target.value)||0)} style={{ width: 80, marginLeft: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, opacity: 0.9 }}>Rate
+                      <input type="number" min={-360} max={360} step={1} value={hueRate} onChange={e => setHueRate(parseFloat(e.target.value)||0)} style={{ width: 80, marginLeft: 4 }} />
+                    </label>
+                  </>
+                )}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Brightness
+                    <input type="range" min={0} max={255} value={brightness} onChange={(e)=>{ const v = parseInt(e.target.value)||0; setBrightness(v); throttledSend('b', v); }} style={{ marginLeft: 6 }} />
+                  </label>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Gamma
+                    <input type="range" min={100} max={300} value={gammaX100} onChange={(e)=>{ const v = parseInt(e.target.value)||220; setGammaX100(v); throttledSend('g', v); }} style={{ marginLeft: 6 }} />
+                  </label>
+                  <button onClick={async ()=>{ if (active) { try { await invoke('device_control_play', { host: active.host, name: 'baked' }); addToast('PLAY', 'info'); } catch (e:any) { addToast(mapUploadError(String(e)), 'error'); } } }} disabled={!active}>Play</button>
+                  <button onClick={async ()=>{ if (active) { try { await invoke('device_control_stop', { host: active.host }); addToast('STOP', 'info'); } catch (e:any) { addToast(mapUploadError(String(e)), 'error'); } } }} disabled={!active}>Stop</button>
+                </div>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -385,6 +566,7 @@ export default function DevicePanel() {
               </table>
             </div>
           )}
+          <ProgressPanel />
         </div>
       )}
 

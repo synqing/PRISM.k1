@@ -6,14 +6,33 @@
 
 ## 🎯 Multi-Agent Architecture
 
-### Agent Roles & Specializations
+### Current Deployment (v1.1 + Studio)
+
+**Status:** Active (2025-10-16)
+**PM:** Captain
+**Agents:** 3 (parallel deployment)
+
+| Agent ID | Mission Brief | Domain | Tasks | Status |
+|----------|---------------|--------|-------|--------|
+| **AGENT-1-FIRMWARE** | `.agent/AGENT_1_FIRMWARE_COMMANDS.md` | Firmware Protocol | 55-58 | 🟢 Ready |
+| **AGENT-2-STUDIO** | `.agent/AGENT_2_STUDIO_FOUNDATION.md` | Desktop App | 41 | 🟢 Ready |
+| **AGENT-3-RELEASE** | `.agent/AGENT_3_RELEASE_V1.1.md` | v1.1 Release | 20 | 🟢 Ready |
+
+**Quick Start:** See `.agent/DEPLOYMENT_QUICKSTART.md`
+
+**Coordination:**
+- Agent 1 → Agent 2: Tasks 55-58 (firmware commands) block Tasks 42, 50 (Studio integration)
+- Agent 2 → Independent: Task 41 (Studio foundation) has no blockers
+- Agent 3 → Independent: Task 20 (Release) dependencies all done
+
+### Historical Deployments (Previous Sprints)
 
 | Agent ID | Tag Context | Domain | Responsibilities |
 |----------|-------------|--------|------------------|
-| **agent-1-network** | `network` | WebSocket, WiFi | Tasks 3-11, 15-17, 26-28 |
-| **agent-2-storage** | `storage` | LittleFS, Patterns | Tasks 4, 7-8, 12-14, 29-30 |
-| **agent-3-playback** | `playback` | LED Driver, Effects | Tasks 18-22, 34 |
-| **agent-4-templates** | `templates` | Pattern Design | Tasks 46-53 |
+| **agent-1-network** | `network` | WebSocket, WiFi | Tasks 3-11, 15-17, 26-28 ✅ COMPLETE |
+| **agent-2-storage** | `storage` | LittleFS, Patterns | Tasks 4, 7-8, 12-14, 29-30 ✅ COMPLETE |
+| **agent-3-playback** | `playback` | LED Driver, Effects | Tasks 18-22, 34 ✅ COMPLETE |
+| **agent-4-templates** | `templates` | Pattern Design | Tasks 46-53 (some complete) |
 | **agent-5-integration** | `integration` | Testing, Optimization | Tasks 31-35, cross-component |
 
 ### Work Stream Isolation

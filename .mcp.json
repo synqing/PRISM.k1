@@ -1,16 +1,16 @@
 {
-  "mcpServers": {
-    "beads": {
-      "type": "stdio",
-      "command": "/Users/spectrasynq/.local/bin/beads-mcp",
-      "env": {
-        "BEADS_PATH": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/.tools/bin/bd",
-        "BEADS_WORKING_DIR": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1",
-        "BEADS_DB": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/.beads/prism.db",
-        "BEADS_NO_AUTO_FLUSH": "false",
-        "BEADS_NO_AUTO_IMPORT": "false"
-      }
-    },
+	"mcpServers": {
+		"beads": {
+			"type": "stdio",
+			"command": "/Users/spectrasynq/.local/bin/beads-mcp",
+			"env": {
+				"BEADS_PATH": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/.tools/bin/bd",
+				"BEADS_WORKING_DIR": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1",
+				"BEADS_DB": "/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/.beads/prism.db",
+				"BEADS_NO_AUTO_FLUSH": "false",
+				"BEADS_NO_AUTO_IMPORT": "false"
+			}
+		},
 		"task-master-ai": {
 			"type": "stdio",
 			"command": "npx",

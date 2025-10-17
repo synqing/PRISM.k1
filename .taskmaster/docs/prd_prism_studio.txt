@@ -1,0 +1,374 @@
+# PRISM Studio - Desktop Pattern Editor PRD
+# Knowledge Fortress Document
+# Date: 2025-10-16
+# Status: DRAFT - Awaiting Captain Approval
+
+## Overview
+Build PRISM Studio: a desktop application (Tauri + React + Rust) for creating LED patterns using a timeline-based interface. Users compose patterns with clips, effects, and automation curves, then compile and sync to PRISM K1 hardware over WebSocket.
+
+## Why
+- **Creation bottleneck**: Users need visual timeline editing (not hand-coding patterns)
+- **Real-time preview**: See changes live in 3D before uploading to hardware
+- **Device integration**: Seamless discover → edit → sync workflow
+- **80/20 rule**: Built-in effects cover 80% of use cases; advanced users get node editor
+- **Market requirement**: Competitors (Twinkly, WLED) have desktop/mobile apps
+
+## Success Criteria
+- **User workflow**: Novice creates first pattern in **< 2 minutes** (discover → template → tweak → sync)
+- **Performance**: Timeline editing at **60 FPS**; preview updates within **50ms** of scrub
+- **Reliability**: Compile + upload **100 KB pattern in < 5 seconds**; zero data loss with autosave
+- **Compatibility**: Works with PRISM K1 firmware (ADR-010 .prism v1.1 format)
+- **File size**: Respects **256 KB limit** (ADR-004) via automatic segmentation
+- **Platform**: macOS/Windows/Linux via Tauri 2
+
+## Core Features
+
+### 1. Device Discovery & Connection
+- **mDNS discovery**: Find devices advertising "prism-k1.local"
+- **WebSocket connection**: Connect to device on port 80 (or configured)
+- **Device info (HELLO)**: Query firmware version, LED count, storage capacity, max chunk size
+- **Connection persistence**: Remember last connected device
+- **Network troubleshooting**: Clear error messages for connection failures
+
+### 2. Timeline Editor
+- **Track-based interface**: Multiple tracks (Effect, Palette, Automation)
+- **Clip manipulation**: Drag to create; move/trim/split; snap to grid (seconds or beats)
+- **Grid modes**: Seconds (default) or beats (with BPM setting)
+- **Playhead control**: Space (play/pause), J/K/L (shuttle), scrub with mouse
+- **Selection**: Rubber-band select; Shift+click to add/remove
+- **Keyboard shortcuts**: Cmd/Ctrl+K (split), Q/W (ripple trim), I/O (in/out), +/- (zoom)
+- **Rendering performance**: 60 FPS canvas; OffscreenCanvas when available; LOD (hide details when zoomed out)
+
+### 3. Effect Library (Built-in)
+- **Generators**: Solid color, Gradient (1D/radial), Wave (sine/triangle/saw), Noise (Perlin/Simplex), Fire
+- **Modifiers**: Brightness, Hue shift, Saturation, Mirror/Ripple
+- **Parameters**: Each effect exposes 3-8 parameters (normalized 0-255)
+- **Presets**: Each effect has 5-10 factory presets
+- **Color space**: OKLab for smooth transitions (avoids muddy RGB blending)
+
+### 4. Automation System
+- **Keyframe curves**: Click track stopwatch to arm; edit creates keys
+- **Easing**: Linear, Ease, Ease-in/out, Custom bezier; F9 for quick "ease"
+- **LFO sources**: Sine, Square, Noise waves to drive parameters
+- **Targets**: Global (brightness), Effect params, Palette blend
+- **Performance**: Bezier handles only shown when selected; simplified curve at zoom-out
+
+### 5. Palette System
+- **Palette clips**: Drag palette onto Palette track
+- **Transitions**: Crossfade between palettes with easing curves
+- **Built-in palettes**: 15 factory palettes (Fire, Ocean, Rainbow, etc.)
+- **Custom palettes**: Create with 2-16 colors; swatch picker
+- **Application**: Effects sample from active palette at timeline position
+
+### 6. 3D Preview (Three.js)
+- **LED representation**: InstancedMesh (320 instances) with real-time color updates
+- **Acrylic plate**: MeshPhysicalMaterial (transmission 0.95, IOR 1.49) for realistic light diffusion
+- **Bloom effect**: UnrealBloomPass on LED layer only (selective bloom)
+- **Camera presets**: Front, Side, Isometric with OrbitControls
+- **Quality modes**: HQ (60fps, full bloom) vs LQ (30fps, no bloom for scrubbing)
+- **Update latency**: < 50ms from timeline change to first rendered preview frame
+
+### 7. Pattern Compiler
+- **Input**: PrismProject (timeline with tracks/clips/automation/palettes)
+- **Output**: .prism v1.1 binary files (ADR-010 format: 80-byte header + GRB24 frame data)
+- **Evaluation**: Timeline → RGB[320] frame-by-frame at specified FPS (60/30/24/15)
+- **Segmentation**: Auto-split patterns exceeding 256 KB into multiple files
+- **FPS adaptation**: Analyze content frequency; downsample static segments to save space
+- **Temporal metadata**: Detect motion patterns (LEFT/RIGHT/CENTER/EDGE) and sync modes (SYNC/OFFSET/PROGRESSIVE/WAVE)
+- **Performance**: Compile in Web Worker; streaming write (no huge RAM spike); typical 5-second pattern in < 500ms
+
+### 8. Upload & Sync
+- **Multi-segment upload**: Compile → upload all segments with progress tracking
+- **Progress feedback**: Show bytes sent / total; update every 100ms
+- **Device storage**: LIST existing patterns with sizes; DELETE old patterns; show storage bar
+- **Sync workflow**: One-click "Sync" button compiles + uploads + plays first segment
+- **Error handling**: Clear messages for storage full, CRC mismatch, connection loss
+
+### 9. Storage & Persistence
+- **Autosave**: IndexedDB every 1 second or 10 edits
+- **Version history**: Keep last 10 versions per project
+- **Export/Import**: .prismproj JSON with embedded thumbnails (base64)
+- **Migration**: Version header in .prismproj; transform old formats on load
+
+### 10. Onboarding
+- **First-run wizard**: Discover device → connect → choose template → tweak brightness/speed → sync → device lights up
+- **Templates**: 10 starter patterns (5 ambient, 5 energy)
+- **Tooltips**: Contextual help on first use
+- **Target time**: Novice user completes workflow in < 2 minutes
+
+## Technical Architecture
+
+### Desktop App (Tauri 2 + React)
+```
+apps/studio/
+  src/
+    app/              # Shell, routing, theming
+    device/           # mDNS discover, WS client (Tauri commands)
+    data/             # Types, schema, validation, migrations
+    timeline/         # Canvas engine (draw, hit-test, edit)
+    automation/       # Curves editor, easing, LFO
+    compiler/         # Project → .prism v1.1 (calls Rust backend)
+    preview/          # Three.js scene (updateLEDs)
+    nodes/            # React Flow (advanced mode)
+    storage/          # IndexedDB autosave
+    onboarding/       # First-run flow
+    ui/               # Reusable components
+  src-tauri/
+    src/
+      device.rs       # WS connect/discover/upload/play/delete
+      mdns.rs         # mDNS discovery
+      compile.rs      # Timeline → .prism v1.1 binary
+      ipc.rs          # Tauri command handlers
+```
+
+### State Management
+- **Zustand + immer**: Fast, time-travel friendly
+- **Command pattern**: Each edit produces inverse op for undo/redo
+- **Undo buffer**: Last 50 operations; compact older patches
+
+### Rendering Strategy
+- **Timeline**: HTML5 Canvas (imperative, 60fps); single requestAnimationFrame loop
+- **Preview**: Three.js with EffectComposer; HQ/LQ quality switch
+- **Compilation**: Web Worker for off-main-thread processing
+
+## Hardware Integration (Firmware Requirements)
+
+### Firmware Changes Needed (9 hours estimate)
+1. **STATUS/HELLO command** (3 hours)
+   - Return: {fw_version, led_count, storage_total, storage_used, max_chunk}
+   - Already has protocol parser; just needs handler
+
+2. **LIST command** (2 hours)
+   - Enumerate /littlefs/patterns/*.prism
+   - Return: [{name, size}, ...]
+   - Use existing littlefs_dir APIs
+
+3. **DELETE command** (1 hour)
+   - Call unlink() on pattern file
+   - Return success/error
+
+4. **mDNS responder** (3 hours)
+   - Advertise "prism-k1.local"
+   - Use ESP-IDF mdns component
+
+### Existing Firmware Features (No Changes)
+- ✅ WebSocket binary protocol (TLV frames)
+- ✅ Upload flow (PUT_BEGIN/PUT_DATA/PUT_END)
+- ✅ PLAY command (CONTROL message type)
+- ✅ .prism v1.1 parser (80-byte header + frame data)
+- ✅ Pattern storage (LittleFS at /littlefs)
+- ✅ Temporal sequencing (ADR-010: motion/sync modes)
+
+## Constraints & Trade-offs
+
+### File Size Limits (ADR-004: 256 KB)
+**Challenge**: 5-second pattern @ 60 FPS = 600 frames × 320 LEDs × 3 bytes = 576 KB (exceeds limit)
+
+**Solution**: Automatic segmentation
+- Split timeline at clip boundaries into multiple .prism files
+- Each segment ≤ 256 KB
+- Adaptive FPS: 60 (default) → 30/24/15 for static content
+- Example: 5s @ 60fps = 2 segments (PatternName__s001.prism, __s002.prism)
+
+**UI Impact**:
+- Size budget meter shows current segment size vs limit
+- Compiler warns before exceeding limit
+- Segments listed in UI with duration and FPS
+
+### Playlist Handling
+**Firmware**: May not have native playlist support initially
+**Studio workaround**: Upload all segments; play sequentially via PLAY commands while connected
+**Future**: Firmware adds playlist support; Studio uploads manifest file
+
+### Seamless Transitions
+**Reality**: 1-frame gap between segments (unless firmware supports crossfade)
+**Acceptable for v1**: Demo quality; fix with firmware playlist later
+
+## Performance Budgets
+
+### Timeline Editor
+- **Frame rate**: ≥ 60 FPS during all interactions
+- **Scrub latency**: ≤ 50ms from mouse move to preview update
+- **Draw cost**: ≤ 5ms per frame typical
+
+### 3D Preview
+- **HQ mode**: 60 FPS sustained (desktop)
+- **LQ mode**: ≥ 30 FPS (mid laptops)
+- **Update latency**: < 50ms from timeline change to first preview frame
+
+### Compiler
+- **Typical pattern**: < 500ms compile time
+- **Upload speed**: > 100 KB/s perceived throughput
+- **UI responsiveness**: Never block main thread (use Web Worker)
+
+### Storage
+- **Autosave**: 1-second intervals; < 10ms overhead
+- **Versions**: 10 per project; total < 5 MB per project in IndexedDB
+
+## Accessibility & UX
+
+### Keyboard Navigation
+- **Full keyboard support**: All transport and edit commands accessible
+- **Shortcuts**: Space, J/K/L, Cmd/Ctrl+K, Q/W, I/O, +/-, \, U, F9
+- **Focus management**: Predictable tab order; visible focus outlines
+
+### Visual Design
+- **High-contrast theme**: Avoid color-only status indicators
+- **Icons + patterns**: Add visual patterns for colorblind users
+- **ARIA roles**: Buttons, lists, sliders properly labeled
+
+### Error Messages
+- **Simple language**: "Storage is full. Free at least 12 KB to upload this pattern."
+- **Actionable**: Always suggest next step
+- **Positive tone**: Avoid blame ("Pattern too large" not "You made the pattern too large")
+
+## Security & Privacy
+
+### Network
+- **Local only**: No cloud services; all communication over LAN
+- **Unknown device warning**: Alert when connecting to new hostname
+- **Secure storage**: Device credentials in OS keychain (Tauri secure-store)
+
+### Telemetry
+- **Opt-in only**: Disabled by default
+- **Anonymous**: If enabled, collect OS, feature usage counts, crash signatures
+- **Settings panel**: Clear toggle with explanation
+
+## Testing Strategy
+
+### Unit Tests
+- **Compiler**: TLV bytes, CRC validation, segmentation logic
+- **Validators**: Overlap detection, bounds checking, ref integrity
+- **Timeline math**: Hit-test, snap, coordinate transforms
+
+### Visual Tests
+- **Canvas golden images**: Fixed zoom level; pixel tolerance in CI
+- **Preview snapshots**: Disable bloom for deterministic tests
+
+### E2E Tests (Playwright)
+- **Mock WS device**: Simulate HELLO/upload/list/play flows
+- **Performance**: Timing asserts (scrub < 50ms, draw < 5ms)
+
+### CI/CD
+- **GitHub Actions**: Build signed macOS app
+- **Artifacts**: Store binaries + symbol maps
+- **Release**: Manual trigger; optional auto-updater later
+
+## Success Metrics
+
+### User Experience
+- **Time to first sync**: ≤ 2 minutes (onboarding test)
+- **Timeline performance**: 60 FPS interactions; scrub ≤ 50ms
+- **Compile speed**: Typical pattern < 500ms
+- **Upload throughput**: > 100 KB/s perceived
+
+### Quality
+- **Crash rate**: < 1% of sessions
+- **Autosave recovery**: 100% of last 10 edits
+- **Build success**: 100% on CI (macOS/Windows/Linux)
+
+## Milestones & Deliverables
+
+### Week 1: Foundation
+- Tauri project setup
+- Data model types
+- IPC commands (discover/connect/status/list/upload/play/delete)
+- Device manager UI
+- Timeline canvas base (grid, playhead, tracks)
+**Acceptance**: Studio connects to K1, shows storage stats
+
+### Week 2: Timeline & Compiler
+- Timeline editing (clips CRUD, move/trim/split)
+- Automation lanes with keyframes
+- Effect library (5 built-in effects)
+- Frame evaluator
+- Segmenter + streaming compiler
+**Acceptance**: Compile 5-second pattern, upload to K1, play successfully
+
+### Week 3: Preview & Polish
+- Three.js preview (InstancedMesh + bloom)
+- Preview updates during scrubbing
+- Size budget meter
+- Onboarding flow
+- Templates (10 patterns)
+- Autosave/versioning
+**Acceptance**: Complete Studio v1.0 ready for user testing
+
+## Dependencies
+
+### Firmware Side
+- Task 21: STATUS/HELLO command (3h)
+- Task 22: LIST command (2h)
+- Task 23: DELETE command (1h)
+- Task 24: mDNS responder (3h)
+**Can run in parallel with Studio development**
+
+### External Libraries
+- Tauri 2 (desktop framework)
+- React 18 (UI)
+- Zustand (state)
+- Three.js (3D preview)
+- React Flow (node editor, Phase 2)
+- IndexedDB (storage)
+
+## Risks & Mitigations
+
+### Risk: WebView rendering inconsistencies (Windows)
+- **Mitigation**: Test in WebView2; normalize.css; "Preview Off" fallback
+
+### Risk: Canvas text DPI blurry
+- **Mitigation**: Scale by devicePixelRatio; cache glyphs
+
+### Risk: Undo buffer memory growth
+- **Mitigation**: Store immer patches; cap at 50; compress snapshots
+
+### Risk: Preview performance drops
+- **Mitigation**: Auto-switch to LQ during drag/scrub; skip bloom; throttle updates
+
+### Risk: File size exceeds limit
+- **Mitigation**: Size budget meter; auto-segment; adaptive FPS; UI warnings
+
+## Phase 2 Features (Future)
+
+### Advanced Mode: Node Editor
+- React Flow graph editor
+- Custom effect graphs (Gen → Mod → Combine → Output)
+- Macro knobs promoted to timeline
+- Bake to clip
+
+### Timeline TLV Format (ADR-011)
+- Smaller files (10-50 KB vs 100-500 KB)
+- Runtime flexibility (change colors without re-upload)
+- Requires firmware TLV executor (80-120 hours)
+- Migration tool (.prism v1.1 → ADR-011)
+
+### Multi-Device Sync
+- Discover multiple K1 units
+- Sync pattern to all devices
+- Coordinated playback
+
+### Audio Reactive
+- Microphone input
+- FFT analysis → parameter mapping
+- Real-time beat detection
+
+## Open Questions (Research Needed)
+
+1. **Temporal metadata optimization**: Can we reduce file size by encoding motion patterns instead of raw frames?
+2. **Compression**: Is LZ4/Zstd feasible in ESP32-S3 for decompression? Trade-off: file size vs decode time
+3. **Effect descriptor format**: Should we standardize a "compiled effect" TLV for future extensibility?
+4. **Multi-segment handover**: Firmware support for seamless playlist transitions?
+5. **OTA pattern updates**: Can Studio push incremental updates instead of full re-upload?
+
+## Approval Required
+
+Captain must approve:
+- ✅ Overall approach (Studio → .prism v1.1 frame-based)
+- ✅ Timeline-based UI paradigm
+- ✅ Segmentation strategy for 256 KB limit
+- ✅ Firmware tasks 21-24 (9 hours of additions)
+- ✅ 2-3 week Studio development timeline
+
+---
+
+**Status**: DRAFT - Awaiting Captain review and approval to proceed with Fortress workflow (PRD → Tasks → Research → Subtasks)

@@ -1,0 +1,202 @@
+# PRISM Studio - Wireframe Integration PRD
+
+## Problem Statement
+
+PRISM Studio requires a production-ready desktop UI to enable LED pattern editing and device synchronization. A high-fidelity wireframe prototype exists with excellent UX design (glass morphism, video editor shortcuts, LGP animation engine) but lacks critical infrastructure (Tauri backend, WebSocket sync, undo/redo, persistence, tests). 
+
+Full adoption risks architectural incompatibility. Building from scratch wastes 43% of working code. A hybrid approach salvages high-value components while building spec-compliant foundation.
+
+## Goals
+
+**Primary:**
+- Deliver production-ready PRISM Studio desktop app (Tasks 41-48 compliant)
+- Preserve wireframe's UX polish (glass morphism, keyboard shortcuts, animation quality)
+- Achieve 28-week delivery timeline (vs 30 weeks from scratch)
+
+**Secondary:**
+- Maintain 60 FPS animation performance
+- Achieve >70% test coverage
+- Zero ADR violations (WebSocket 4KB, 120 FPS, 320 LEDs)
+
+## Solution: Hybrid Integration Strategy
+
+### Phase 1: Foundation (Weeks 1-6) - MVP Target
+
+**Extract from Wireframe:**
+- K1AnimationEngine.ts → studio/src/lib/animation/
+- useKeyboardShortcuts.ts → studio/src/hooks/
+- Radix UI components → studio/src/components/ui/
+- Design tokens (Tailwind) → studio/src/styles/
+
+**Build Per Spec:**
+- Scaffold Tauri 2.0 desktop app (Task 41)
+  - CSP headers, filesystem scope restrictions
+  - TypeScript 5.6 + ESLint 9 + Prettier
+  - Vitest + Playwright test infrastructure
+  - CI matrix (macOS, Windows, Linux)
+
+- Implement mDNS device discovery (Task 42)
+  - `mdns-sd` Rust crate integration
+  - Discover `_prism-k1._tcp.local` services
+  - Tauri IPC commands (device_discover, device_connect)
+
+- Implement WebSocket binary protocol (Task 42)
+  - 4KB TLV frame buffer (ADR-002 compliant)
+  - PUT_BEGIN → PUT_DATA → PUT_END flow
+  - Connection pooling + backoff (100ms→2s)
+  - Error codes (NO_DEVICE, TIMEOUT, HELLO_UNSUPPORTED)
+
+**Deliverable:** Desktop app with device discovery + live sync
+
+### Phase 2: State & Persistence (Weeks 7-13) - Alpha Target
+
+**Refactor Wireframe State:**
+- Convert appState.ts → Zod + immer + zundo architecture
+  - Align with official projectSchema.ts
+  - Add temporal middleware (50-state history)
+  - Implement command pattern for undo/redo
+
+**Build Persistence Layer (Task 43):**
+- IndexedDB autosave (throttled: 1s or 10 edits)
+- Version history ring buffer (last 10 snapshots)
+- Migration pipeline (v1 → v2 schema evolution)
+- Tauri file I/O (save/open .prismproj files)
+
+**Rebuild Timeline (Task 44):**
+- Canvas 2D rendering with OffscreenCanvas fallback
+- 60 FPS render loop (grid + tracks + clips + playhead)
+- LOD optimization (<5ms draw cost when zoomed out)
+- Keyboard shortcuts (J/K/L shuttle, Space play/pause)
+- Pointer events (click to seek, drag to select)
+
+**Deliverable:** Working timeline editor with save/load
+
+### Phase 3: Editing Interactions (Weeks 14-20) - Beta Target
+
+**Implement Clip Editing (Task 45):**
+- Drag-create clips on empty regions
+- Drag-move clips with snap to grid
+- Edge trimming (resize clip duration)
+- Split clip (Cmd+K at playhead)
+- Ripple delete (remove clip + shift subsequent)
+- Rubber-band selection (Shift+drag marquee)
+
+**Refactor Effect System (Task 46):**
+- Convert LGP patterns to generic effect registry
+- Preserve K1AnimationEngine.ts as effect plugin
+- Implement effect evaluator pipeline
+- Add OKLab color blending (vs RGB)
+- Build palette manager (2-16 swatches)
+
+**Deliverable:** Production timeline with advanced editing
+
+### Phase 4: Preview & Polish (Weeks 21-28) - Release Candidate
+
+**Add 3D Preview (Task 48):**
+- Three.js InstancedMesh for 320 LEDs
+- UnrealBloomPass post-processing
+- OrbitControls with presets (front, side, isometric)
+- HQ/LQ quality toggle
+- Screenshot capture pipeline
+
+**Testing & QA:**
+- Unit tests (animation engine, state mutations) → 80% coverage
+- Integration tests (device sync, file I/O) → 60% coverage
+- E2E tests (Playwright: timeline workflows) → critical paths
+- Performance profiling (Canvas <5ms, preview <50ms)
+
+**Deliverable:** Tasks 41-48 complete, production-ready
+
+## Success Metrics
+
+**Must-Have (MVP):**
+- Desktop app runs on macOS/Windows/Linux (Tauri builds)
+- Device discovery via mDNS + manual IP
+- WebSocket sync to K1 hardware (binary TLV)
+- Timeline canvas rendering at 60 FPS
+- Undo/redo with 50-state history
+- Save/load .prismproj files
+- Keyboard shortcuts (J/K/L, Space, Cmd+Z)
+
+**Should-Have (Beta):**
+- Drag-and-drop clip editing
+- IndexedDB autosave every 5s
+- Pattern compiler (Timeline → .prism binary)
+- 3D Three.js preview with bloom
+- >70% test coverage
+
+**Nice-to-Have (v1.1):**
+- Automation curves with keyframes (Task 47)
+- LFO modulation sources
+- Node editor execution
+- Cloud sync
+
+## Technical Constraints
+
+**ADR Compliance (CANON.md):**
+- ADR-002: WebSocket 4KB buffer size
+- ADR-003: 320 LED count (160 top, 160 bottom)
+- ADR-008: 120 FPS playback target
+- ADR-010: LGP Motion modes (LEFT/RIGHT/CENTER/EDGE/STATIC)
+- ADR-010: SyncMode enums (SYNC/OFFSET/PROGRESSIVE/WAVE/CUSTOM)
+
+**Performance Targets:**
+- Timeline: <5ms draw cost (Task 44)
+- Preview: <50ms update latency (Task 48)
+- State updates: <1ms mutations
+- Animation: 60 FPS sustained
+
+**Security Requirements:**
+- Tauri CSP headers (default-src 'self')
+- Filesystem scope restrictions (project directory only)
+- Stronghold key storage (device credentials)
+- Input validation (IP regex, file size limits)
+- TLS for WebSocket (wss:// not ws://)
+
+## Risk Mitigation
+
+**Risk 1: Timeline Rewrite Complexity**
+- Mitigation: Prototype canvas pipeline in isolation first
+- Fallback: Keep DOM timeline as "legacy mode" during transition
+
+**Risk 2: No Test Coverage**
+- Mitigation: Add Vitest in Week 1, write tests BEFORE refactoring
+- Target: 70% coverage for state + animation engine
+
+**Risk 3: WebSocket Protocol Mismatch**
+- Mitigation: Use firmware test fixtures, implement with Rust `nom` parser
+- Validation: Cross-check with firmware integration tests
+
+**Risk 4: Schedule Overrun**
+- Mitigation: Add 30% buffer (28w → 36 weeks realistic)
+- Prioritize: CRITICAL features first (can ship without Task 47 automation)
+
+## Open Questions
+
+1. Should we keep 2D preview AND add 3D preview (dual mode)?
+2. Defer Task 47 (automation) to v1.1 to hit 20-week MVP?
+3. Use wireframe's glass morphism or official brand guidelines?
+4. Salvage Radix UI (26 packages) or rebuild with native components?
+
+## Research Needs
+
+**Animation Engine Validation:**
+- Verify LGP physics accuracy against hardware measurements
+- Benchmark pixel rendering performance (Canvas 2D vs WebGL)
+- Test temporal offset range (60-300ms phi phenomenon)
+
+**State Management Architecture:**
+- Research zundo + immer compatibility with Zustand v4
+- Investigate command pattern for inverse operations
+- Evaluate IndexedDB vs Tauri secure storage for credentials
+
+**Timeline Rendering Optimization:**
+- Research OffscreenCanvas browser support (WebView2 fallback)
+- Investigate LOD strategies (clip thumbnail caching)
+- Benchmark dirty rect rendering performance
+
+**WebSocket Protocol Implementation:**
+- Research binary TLV parsers (Rust `nom`, TypeScript `struct`)
+- Investigate mTLS for device authentication
+- Evaluate compression algorithms for pattern upload
+

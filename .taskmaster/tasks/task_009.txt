@@ -1,0 +1,56 @@
+# Task ID: 9
+# Title: Surface Upload Progress, Errors, and TTFL Metrics
+# Status: pending
+# Dependencies: 7, 8
+# Priority: high
+# Description: Deliver actionable progress UI, error mapping, and instrumentation to meet <3 min TTFL.
+# Details:
+Augment `DevicePanel` and logger to subscribe to `upload:progress` / `upload:error` events, mapping error codes (CRC mismatch, TLV_CRC_INVALID, DEVICE_ERROR strings) to friendly messages with resolution tips. Record timeline marks (`performance.now()`) for graph bake, packaging, upload, and play commands, displaying latest TTFL and throughput in the UI. Add retry hints for oversized graphs (>256 KB) and highlight when fps defaults down from 120 due to limits.
+Wireframe refs: Progress + error display patterns per WIRED_FUNCTIONALITY.md and PRODUCTION_READY_SUMMARY.md.
+
+Acceptance Checklist (wireframe parity)
+- [ ] Telemetry schema covers phases/percent/bytes/s/TTFL
+- [ ] Errors mapped to friendly messages per taxonomy
+- [ ] Optional JSONL export present in logs/
+
+# Test Strategy:
+Add vitest tests for error mapper utility to ensure firmware errors map correctly. Use Playwright to simulate slow uploads (mock progress) validating TTFL metrics render and update. Verify logger receives structured entries.
+Telemetry/alerts presentation aligns with wireframe UI patterns.
+
+# Subtasks:
+## 1. Instrument upload progress and TTFL timing hooks [pending]
+### Dependencies: None
+### Description: Subscribe to upload events and capture timing metrics for bake, package, upload, and play.
+### Details:
+Extend DevicePanel state management to listen for upload:progress and upload:error events, capture performance.now() marks for each upload phase, compute TTFL and throughput, and persist the latest metrics for display/logging.
+
+## 2. Map firmware error codes to user-facing guidance [pending]
+### Dependencies: None
+### Description: Create friendly messages and recovery tips for known upload error codes.
+### Details:
+Implement an error mapping utility covering CRC mismatch, TLV_CRC_INVALID, DEVICE_ERROR variants, and oversized graph cases, providing user copy with resolution tips and retry guidance for >256 KB payloads.
+
+## 3. Render progress UI with TTFL, throughput, and fallback alerts [pending]
+### Dependencies: 9.1, 9.2
+### Description: Display actionable progress, error, and performance signals in DevicePanel.
+### Details:
+Update DevicePanel UI to render progress bars, TTFL and throughput metrics, show retry hints for large graphs, and highlight when FPS drops from 120, ensuring structured logs reflect the surfaced state.
+
+## 4. Telemetry types & mappers module [pending]
+### Dependencies: None
+### Description: Create telemetry.ts with types for phases, progress payloads, and error taxonomy.
+### Details:
+Exports UploadPhase, UploadProgress, UploadErrorCode and mapping helpers.
+
+## 5. Wire DevicePanel to telemetry events [pending]
+### Dependencies: 9.1
+### Description: Subscribe to telemetry:* and upload:* events; render TTFL/throughput; throttle updates.
+### Details:
+Ensure UI updates at <=10Hz; combine with upload slice.
+
+## 6. Dashboard hooks & JSONL export [pending]
+### Dependencies: None
+### Description: Add optional JSONL log export for soak/CI and dashboard ingestion.
+### Details:
+Append to logs/recent_uploads.jsonl with structured entries.
+

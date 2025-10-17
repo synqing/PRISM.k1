@@ -26,6 +26,10 @@ type ProjectState = {
   openProjectFromPath: (path: string) => Promise<void>;
   addRecent: (path: string) => void;
   clearRecent: () => void;
+  setLastBake: (stats: {
+    fps: number; ledCount: number; frames: number; payloadSize: number; totalSize: number;
+    ttflMs?: number; startedAt?: number | null; finishedAt?: number | null; throughputBps?: number;
+  }) => void;
 };
 
 export const useProjectStore = create<ProjectState>()(
@@ -202,6 +206,23 @@ export const useProjectStore = create<ProjectState>()(
                 })();
               }
             }, false, 'project/clearRecent'),
+
+          setLastBake: (stats) =>
+            set((s) => {
+              s.project.lastBake = {
+                fps: stats.fps,
+                ledCount: stats.ledCount,
+                frames: stats.frames,
+                payloadSize: stats.payloadSize,
+                totalSize: stats.totalSize,
+                ttflMs: stats.ttflMs ?? undefined,
+                startedAt: stats.startedAt ?? undefined as any,
+                finishedAt: stats.finishedAt ?? undefined as any,
+                throughputBps: stats.throughputBps ?? undefined,
+              } as any;
+              s.project.updatedAt = new Date().toISOString();
+              s.isDirty = true;
+            }, false, 'project/setLastBake'),
         };
       }),
       {

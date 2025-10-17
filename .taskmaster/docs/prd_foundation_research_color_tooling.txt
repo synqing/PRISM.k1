@@ -1,0 +1,153 @@
+<rpg-method>
+# PRISM K1: Foundation Research PRD (Color/Shows/Packaging)
+
+Goal: Make the highest‑leverage decisions BEFORE implementation. Produce decision memos that drive palette space, RGBW strategy, show families, packaging, previews, parser tags, and firmware budgets.
+
+Scope: Agent‑aligned research tracks → R3 (Tooling/Release), R2 (Parser/Format), R1 (Firmware constraints).
+</rpg-method>
+
+<overview>
+## Problem Statement
+Downstream quality (visual fidelity, compression, runtime stability) is dominated by early color/algorithm/encoding choices. We need crisp decisions with trade‑off analysis to avoid rework and unlock compounding benefits across presets, docs, and release.
+
+## Target Users
+Agent 3 (tooling/release), Agent 2 (parser/format), Agent 1 (firmware runtime constraints).
+
+## Success Metrics
+- Clear written decisions with rationale and recommended actions
+- Implementation tasks gated on research outputs
+- Reduced iteration (no palette/show/packaging reversals later)
+</overview>
+
+<functional-decomposition>
+## Capability: Color Space & Palettes (R3)
+
+### Feature: R3.1 Color‑space decision (OKLab/OKLCH vs HSLuv vs HSV/HSL)
+- **Description**: Evaluate perceptual uniformity, hue stability, palette authoring UX, performance, licensing.
+- **Inputs**: Sample palettes (2/3‑stop ramps), LED count=160, performance targets.
+- **Outputs**: Decision memo with recommended space + migration plan.
+- **Behavior**: Empirical banding/ΔE checks; library survey; rec with examples.
+
+### Feature: R3.2 RGB→RGBW strategy
+- **Description**: Compare HSI‑based mapping vs whiteness extraction + light calibration.
+- **Inputs**: Test colors incl. pastels; SK6812 assumptions; target white CCT options.
+- **Outputs**: Baseline mapping for dev tool; staged calibration roadmap.
+- **Behavior**: Survey formulas, implement prototypes; specify when to calibrate.
+
+## Capability: Show Algorithms (R3)
+
+### Feature: R3.3 Show family selection
+- **Description**: Identify 2–3 generator families (e.g., phase waves, noise morphs, flow fields) that compress well and look good at 160 LEDs.
+- **Inputs**: Visual criteria, compressibility, param richness.
+- **Outputs**: Decision memo + parameter schema for each family.
+- **Behavior**: Literature/repo scan; pick minimal set for v1.
+
+## Capability: Packaging & Runtime (R3/R1)
+
+### Feature: R3.4 Packaging trade study (.prism sequences)
+- **Description**: Compare palette+indices, delta encoding, RLE; size vs decode speed at 120 FPS on S3.
+- **Inputs**: Frame counts (e.g., 16s @ 120FPS), 160 LEDs.
+- **Outputs**: Recommended encoding(s) + constraints to enforce.
+
+### Feature: R1.1 Firmware decode budget envelope
+- **Description**: Microbench constraints on S3 for safe per‑frame decode (CPU/memory).
+- **Inputs**: Minimal test harness; measured cycles.
+- **Outputs**: Budget numbers to inform R3.4.
+
+## Capability: Preview Fidelity (R3)
+
+### Feature: R3.5 Preview mapping guidelines
+- **Description**: Determine gamma/saturation mapping that approximates LED look in terminal/HTML previews.
+- **Inputs**: Sample ramps/shows; known LED gamma.
+- **Outputs**: Recommended preview parameters; doc snippet.
+
+## Capability: Parser/Format Tags (R2)
+
+### Feature: R2.1 v1.1 metadata extensions
+- **Description**: Propose palette/ramp tags (e.g., palette_id, ramp_space) and show param encoding.
+- **Outputs**: Spec additions + backward compatibility notes.
+
+### Feature: R2.2 Header/CRC implications
+- **Description**: Validate v1.1 header layout for new fields; CRC coverage; streaming constraints.
+- **Outputs**: Spec confirmation/adjustments.
+</functional-decomposition>
+
+<structural-decomposition>
+## Repository Structure (research artifacts)
+```
+firmware/docs/research/
+├── R3.1_color_space_decision.md
+├── R3.2_rgbw_strategy.md
+├── R3.3_show_families.md
+├── R3.4_packaging_tradeoffs.md
+├── R3.5_preview_guidelines.md
+├── R2.1_metadata_extensions.md
+└── R2.2_header_crc_implications.md
+```
+
+Modules map 1:1 to features above; each exports a decision memo.
+</structural-decomposition>
+
+<dependency-graph>
+## Dependency Chain
+
+### Research Foundation (Phase R0)
+- **R1.1 Firmware decode budget**: No deps
+- **R3.1 Color‑space decision**: No deps
+- **R3.2 RGBW strategy**: No deps
+- **R3.3 Show family selection**: No deps
+- **R3.4 Packaging trade study**: Depends on [R1.1]
+- **R3.5 Preview guidelines**: Depends on [R3.1]
+- **R2.1 Metadata extensions**: Depends on [R3.1, R3.3]
+- **R2.2 Header/CRC implications**: Depends on [R2.1]
+
+### Implementation (gates)
+- **Palette tooling (Task 23)**: Depends on [R3.1]
+- **Previews (Tasks 26/27)**: Depends on [R3.5]
+- **Shows (Task 28/29)**: Depends on [R3.3]
+- **Packaging (Task 30)**: Depends on [R3.4, R2.2]
+</dependency-graph>
+
+<implementation-roadmap>
+## Development Phases
+
+### Phase R0: Research Memos
+**Goal**: Produce decisions that gate implementation.
+**Tasks**:
+- [ ] R1.1 Firmware decode budget (depends on: none)
+- [ ] R3.1 Color‑space decision (depends on: none)
+- [ ] R3.2 RGBW strategy (depends on: none)
+- [ ] R3.3 Show family selection (depends on: none)
+- [ ] R3.4 Packaging trade study (depends on: R1.1)
+- [ ] R3.5 Preview guidelines (depends on: R3.1)
+- [ ] R2.1 Metadata extensions (depends on: R3.1, R3.3)
+- [ ] R2.2 Header/CRC implications (depends on: R2.1)
+
+**Exit Criteria**: Decision memos filed under docs/research/ with clear “Recommended Action”.
+
+### Phase R1+: Implementation (already planned)
+Gated by R0 outputs; see existing tasks 23, 26, 27, 28, 29, 30.
+</implementation-roadmap>
+
+<test-strategy>
+## Validation
+- Each memo must include: problem definition, options considered, evaluation (qual/quant), decision, migration plan.
+- Where applicable, include artifacts (plots, example palettes, frame size estimates).
+</test-strategy>
+
+<architecture>
+## Notes
+- Research provider: Perplexity (preferred). Record sources.
+- Keep decisions small and actionable; avoid boiling the ocean.
+</architecture>
+
+<risks>
+## Risks
+- Analysis paralysis → timebox each memo; pick “good enough” and iterate later if needed.
+- Upstream lib drift → pin versions; document alternatives.
+</risks>
+
+<appendix>
+## References
+- OKLab/OKLCH, HSLuv docs; LED calibration articles; prior art repos.
+</appendix>

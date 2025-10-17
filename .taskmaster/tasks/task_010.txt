@@ -1,0 +1,49 @@
+# Task ID: 10
+# Title: Automate Reliability & Performance Validation
+# Status: pending
+# Dependencies: 6, 7, 8, 9
+# Priority: medium
+# Description: Create automated tests to prove 50 consecutive uploads succeed and 120 FPS holds.
+# Details:
+Write a soak script in `tools/validation/soak_playlist.ts` (or extend existing `tools/validation/soak_playlist.py`) that drives the Bake & Upload flow via Tauri CLI hooks or Playwright, executing 50 uploads against a loopback device stub verifying CRC at PUT_END. Add vitest performance tests asserting evaluator maintains 120 FPS for 2×160 LEDs (<16.7ms/frame) and integrate metrics into CI. Document manual visual verification steps in `docs/validation/TTFL.md` for hardware-in-loop checks.
+
+# Test Strategy:
+Run soak script in CI nightly with artifacts capturing throughput/TTFL, failing if any CRC mismatch or upload error occurs. Include vitest performance assertions and Playwright regression to confirm fps + TTFL thresholds.
+
+# Subtasks:
+## 1. Build soak upload script for 50-run reliability [pending]
+### Dependencies: None
+### Description: Implement an automated soak runner that executes 50 consecutive Bake & Upload cycles against a loopback stub via Tauri CLI or Playwright.
+### Details:
+Create or extend tooling in `tools/validation/soak_playlist.(ts|py)` to orchestrate Bake & Upload workflows, drive the loopback device stub, verify CRC at PUT_END, gather timing metrics, and expose CLI flags for run count and report output.
+
+## 2. Implement 120 FPS performance regression tests [pending]
+### Dependencies: None
+### Description: Add automated performance checks ensuring evaluator sustains 120 FPS for 2×160 LEDs with <16.7 ms frame times.
+### Details:
+Author vitest performance suites that load representative playlists, benchmark the evaluator for 2×160 LED payloads, assert frame processing stays under the 16.7 ms ceiling, and publish metrics for CI consumption alongside soak results.
+
+## 3. Document manual TTFL hardware verification protocol [pending]
+### Dependencies: 10.1, 10.2
+### Description: Capture human-in-the-loop validation steps for verifying throughput and TTFL on real hardware.
+### Details:
+Update `docs/validation/TTFL.md` detailing required test rigs, visual inspection checklist, confirmation steps for 50-upload soak results, FPS telemetry expectations, recovery actions, and how to correlate with automated soak/perf logs.
+
+## 4. Mock WebSocket device tool [pending]
+### Dependencies: None
+### Description: Implement tools/validation/mock_device_ws.mjs handling TLV and CRC checks.
+### Details:
+Ack PUT_*, enforce offsets, verify CRC on PUT_END; inject errors.
+
+## 5. CI artifacts & thresholds [pending]
+### Dependencies: 10.1
+### Description: Produce summary.json with TTFL/throughput; fail on thresholds; upload artifacts.
+### Details:
+Integrate with CI; parametrize limits; attach logs and bundles.
+
+## 6. Repro bundle collection [pending]
+### Dependencies: 10.1
+### Description: On failure, collect inputs, transcript, env and write to artifacts.
+### Details:
+Zip .prism, chunks, error logs; include device STATUS and env snapshot.
+

@@ -1,0 +1,52 @@
+# Task ID: 5
+# Title: Port ADR-009 .prism Packaging to TypeScript
+# Status: pending
+# Dependencies: 3, 4
+# Priority: high
+# Description: Package evaluated frames into ADR-009 compliant .prism binaries with CRC-32.
+# Details:
+Align implementation with current Studio/Tools layout. Build new TypeScript packer at `studio/src/lib/bake/packPrism.ts` and model its CRC usage on existing precedent in `studio/scripts/upload-pattern.mjs` (imports `crc-32`). Implement ADR-009 header assembly, payload chunking, XOR delta + RLE, palette metadata embedding, 256 KB cap enforcement, and CRC-32 IEEE 0xEDB88320 via the `crc-32` npm module already used in the repo. Provide API: `packPrism({ frames, fps, ledCount, paletteLut }) => { bytes: Uint8Array, stats: { version, frameCount, fps, ledCount, payloadSize, totalSize, headerCrc, payloadCrc, errors?: string[] } }`. Integrate stats with the project save flow in `studio/src/stores/project.ts` so the latest bake diagnostics are persisted for UI diagnostics. For Python parity and CRC cross-checks, use `tools/validation/prism_sanity.py` as the authoritative CRC verifier and create mirrored fixtures in `tools/tests/prism/` to compare bytes and CRCs. Tests should live under `studio/src/lib/bake/__tests__/packPrism.test.ts` and use `vitest` per `studio/vitest.config.ts`. Document size/CRC thresholds and error taxonomy to surface actionable messages to the UI and CI logs.
+
+# Test Strategy:
+- Unit: Create Vitest cases under `studio/src/lib/bake/__tests__/packPrism.test.ts` comparing `packPrism` output to Python-generated fixtures in `tools/tests/prism/`. Assert byte-for-byte equality, header fields (version, frame count, fps), and both header/payload CRCs match values recomputed in test using `crc-32`.
+- Limits/guardrails: Tests for payload and total size boundaries (≤256 KB), invalid frames/palette lengths, and error taxonomy mapping (e.g., PRISM_TOO_LARGE, MALFORMED_FRAMES, PALETTE_LENGTH_MISMATCH) to actionable messages.
+- Integration: Stub the consumer in `studio/src/stores/project.ts` to confirm stats persistence and serialization/deserialization roundtrips. Ensure CI logs capture pack stats (sizes, CRCs) via a packer step and that UI components can read/display stats.
+- Parity: Add a script to re-verify fixtures with `tools/validation/prism_sanity.py` in CI; tests should fail if recomputed CRC mismatches.
+
+# Subtasks:
+## 1. Design TypeScript packPrism module structure [pending]
+### Dependencies: None
+### Description: Review ADR-009 and the Python packer to outline the new TypeScript API surface.
+### Details:
+Audit current repo CRC usage in `studio/scripts/upload-pattern.mjs` and any ADR-009 rules, then define TypeScript typings for frames, stats, and packPrism parameters/return values. Document module responsibilities and expected locations: implementation in `studio/src/lib/bake/packPrism.ts`, tests in `studio/src/lib/bake/__tests__/packPrism.test.ts`.
+
+## 2. Implement ADR-009 binary assembly in TypeScript [pending]
+### Dependencies: 5.1
+### Description: Port the Python packaging logic into packPrism.ts covering headers, payload transforms, and CRC.
+### Details:
+Translate header construction, frame chunking, XOR delta plus RLE compression, palette metadata embedding, and 256KB enforcement. Integrate `crc-32` to emit bytes and stats from `packPrism`. Place implementation in `studio/src/lib/bake/packPrism.ts` and export `packPrism` with the defined API.
+
+## 3. Expose packPrism stats and persistence integration [pending]
+### Dependencies: 5.1, 5.2
+### Description: Add UI-facing stats reporting and persist latest bake metrics in project save flow.
+### Details:
+Extend `packPrism` return shape with error/size stats. Update `studio/src/stores/project.ts` save logic to store recent bake diagnostics (sizes, CRCs, counts). Ensure consumers (UI) handle the new data contract and display stats.
+
+## 4. Add Python parity fixtures and CRC cross-checks [pending]
+### Dependencies: 5.2
+### Description: Parity fixtures & CRC verification.
+### Details:
+Create Python-mirrored fixtures derived from an equivalent algorithm and verified by `tools/validation/prism_sanity.py`. Store under `tools/tests/prism/` (e.g., `.prism` binaries plus JSON of expected header/payload CRCs). In Vitest (`studio/src/lib/bake/__tests__/packPrism.test.ts`), assert byte-for-byte equality and both header/payload CRCs via `crc-32` recomputation.
+
+## 5. Implement size/format guardrails and error mapping [pending]
+### Dependencies: 5.2
+### Description: Error taxonomy & guardrails.
+### Details:
+Enforce ≤256KB cap and surface `PRISM_TOO_LARGE`. Validate frames and palette lengths; surface `MALFORMED_FRAMES`, `PALETTE_LENGTH_MISMATCH`, `UNSUPPORTED_FPS_BOUNDS` (if applicable). Map pack errors to user-facing guidance for Task 9 and include remediation tips in error strings. Ensure guardrails are applied before packaging to avoid wasted work.
+
+## 6. CI packer step and stats reporting [pending]
+### Dependencies: 5.3
+### Description: CI integration & stats.
+### Details:
+Add a CI step to run the packer against sample inputs and emit pack stats (sizes, CRCs) to logs. Expose a small API/read helper for UI to display pack stats and thresholds. Document thresholds (≤256KB total, CRC expectations) in `docs/` and ensure logs include the same metrics for quick diagnosis.
+

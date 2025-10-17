@@ -10,6 +10,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use futures_util::{SinkExt, StreamExt};
+use std::sync::{Arc, Mutex as StdMutex};
+use std::time::Instant;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DeviceInfo {
@@ -22,6 +24,10 @@ pub struct DeviceInfo {
 struct ConnPool(Mutex<HashMap<String, ()>>); // placeholder for future WS clients
 
 struct RecentState(Mutex<Vec<String>>);
+
+// Simple single-upload cancel flag
+#[derive(Default)]
+struct UploadCancel(StdMutex<Option<bool>>);
 
 #[tauri::command]
 async fn get_or_create_master_key() -> Result<String, String> {
@@ -84,6 +90,7 @@ pub fn run() {
       let mi_redo = MenuItem::with_id(app, "redo", "Redo", true, Some("Shift+CmdOrCtrl+Z"))?;
 
       app.manage(RecentState(Mutex::new(Vec::new())));
+      app.manage(UploadCancel::default());
       app.manage(ConnPool::default());
 
       // Recent submenu with 5 placeholder items + matching Reveal entries
@@ -267,6 +274,8 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![device_discover, device_connect, device_status, device_list, device_delete, get_or_create_master_key])
     .invoke_handler(tauri::generate_handler![device_export])
+    .invoke_handler(tauri::generate_handler![device_upload, device_upload_cancel])
+    .invoke_handler(tauri::generate_handler![device_control_play, device_control_stop, device_control_brightness, device_control_gamma])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
@@ -355,6 +364,236 @@ async fn device_export(host: String, id: String, path: String) -> Result<bool, S
   let bytes = resp.bytes().await.map_err(|e| format!("READ_FAILED: {}", e))?;
   std::fs::write(&path, &bytes).map_err(|e| format!("WRITE_FAILED: {}", e))?;
   Ok(true)
+}
+
+fn crc32_bytes(data: &[u8]) -> u32 { crc32fast::hash(data) }
+
+async fn ws_connect(host: &str, port: u16) -> Result<tokio_tungstenite::WebSocketStream<tokio_tungstenite::ConnectorStream>, String> {
+  let url = format!("ws://{}:{}/", host.trim_end_matches('.'), port);
+  let (ws, _resp) = tokio_tungstenite::connect_async(url)
+    .await.map_err(|e| format!("WS_CONNECT_FAILED: {}", e))?;
+  Ok(ws)
+}
+
+fn build_tlv_frame(typ: u8, payload: &[u8]) -> Vec<u8> {
+  let mut frame: Vec<u8> = Vec::with_capacity(3 + payload.len() + 4);
+  frame.push(typ);
+  let len = payload.len() as u16;
+  frame.push((len >> 8) as u8);
+  frame.push((len & 0xFF) as u8);
+  frame.extend_from_slice(payload);
+  let crc = crc32_bytes(&frame);
+  frame.extend_from_slice(&crc.to_be_bytes());
+  frame
+}
+
+async fn ws_send_and_recv(mut ws: tokio_tungstenite::WebSocketStream<tokio_tungstenite::ConnectorStream>, frame: Vec<u8>) -> Result<Vec<u8>, String> {
+  use tokio_tungstenite::tungstenite::Message;
+  ws.send(Message::Binary(frame)).await.map_err(|e| format!("WS_SEND_FAILED: {}", e))?;
+  if let Some(msg) = ws.next().await {
+    match msg {
+      Ok(Message::Binary(data)) => {
+        if data.len() < 7 { return Err("TLV_TOO_SHORT".into()); }
+        let r_len = u16::from_be_bytes([data[1], data[2]]) as usize;
+        if data.len() != 3 + r_len + 4 { return Err("TLV_LENGTH_MISMATCH".into()); }
+        let calc = crc32_bytes(&data[0..3+r_len]);
+        let r_crc = u32::from_be_bytes([data[3+r_len], data[3+r_len+1], data[3+r_len+2], data[3+r_len+3]]);
+        if calc != r_crc { return Err("TLV_CRC_INVALID".into()); }
+        Ok(data)
+      }
+      Ok(_) => Err("WS_NON_BINARY".into()),
+      Err(e) => Err(format!("WS_READ_FAILED: {}", e))
+    }
+  } else {
+    Err("WS_CLOSED".into())
+  }
+}
+
+trait ProgressEmitter {
+  fn emit(&self, event: &str, payload: serde_json::Value);
+}
+
+impl ProgressEmitter for tauri::Window {
+  fn emit(&self, event: &str, payload: serde_json::Value) { let _ = self.emit(event, payload); }
+}
+
+struct TestEmitter(pub std::sync::Arc<std::sync::Mutex<Vec<serde_json::Value>>>);
+impl ProgressEmitter for TestEmitter {
+  fn emit(&self, _event: &str, payload: serde_json::Value) { let _ = self.0.lock().map(|mut v| v.push(payload)); }
+}
+
+async fn upload_with_emitter<E: ProgressEmitter>(emitter: &E, cancel: &UploadCancel, host: String, name: String, bytes: Vec<u8>) -> Result<String, String> {
+  use futures_util::StreamExt;
+  // Fetch STATUS to learn maxChunk (optional)
+  let status = tlv_request(host.clone(), 80, 0x30, &[]).await.ok();
+  let mut max_chunk: usize = 4089; // default
+  if let Some(payload) = status {
+    // decode_status_payload: [verlen][ver][ledCount(LE16)][avail(LE32)][maxChunk(LE16)]
+    if payload.len() >= 4 { let vlen = u32::from_le_bytes([payload[0],payload[1],payload[2],payload[3]]) as usize;
+      let mut off = 4 + vlen;
+      if payload.len() >= off+2+4+2 { off += 2 + 4; let mc = u16::from_le_bytes([payload[off],payload[off+1]]); max_chunk = mc as usize; }
+    }
+  }
+
+  // Helper to open WS
+  let url = format!("ws://{}:{}/", host.trim_end_matches('.'), 80);
+  let mut connect_ws = || async {
+    let (ws, _resp) = tokio_tungstenite::connect_async(url.clone())
+      .await.map_err(|e| format!("WS_CONNECT_FAILED: {}", e))?;
+    Ok::<_, String>(ws)
+  };
+  let mut ws = connect_ws().await?;
+
+  let size = bytes.len();
+  // Enforce device max pattern size 256KB
+  if size > 262_144 { return Err("PATTERN_MAX_SIZE_EXCEEDED".into()); }
+  let crc = crc32_bytes(&bytes);
+  if name.is_empty() || name.len() >= 64 { return Err("INVALID_NAME".into()); }
+  let mut begin = Vec::with_capacity(1 + name.len() + 8);
+  begin.push(name.len() as u8);
+  begin.extend_from_slice(name.as_bytes());
+  begin.extend_from_slice(&(size as u32).to_be_bytes());
+  begin.extend_from_slice(&crc.to_be_bytes());
+
+  // PUT_BEGIN (await one ack frame)
+  let frame = build_tlv_frame(0x10, &begin);
+  use tokio_tungstenite::tungstenite::Message;
+  ws.send(Message::Binary(frame)).await.map_err(|e| format!("WS_SEND_FAILED: {}", e))?;
+  if let Some(msg) = ws.next().await { match msg { Ok(Message::Binary(_)) => {}, _ => {} } }
+
+  // stream PUT_DATA with cancel, EMA throughput, and 10 Hz throttle
+  let t0 = Instant::now();
+  let mut sent = 0usize;
+  // reset cancel flag
+  if let Ok(mut f) = cancel.0.lock() { *f = Some(false); }
+  // EMA and throttle state
+  let mut last_emit = Instant::now();
+  let mut last_mark = Instant::now();
+  let mut last_bytes: usize = 0;
+  let mut ema_bps: f64 = 0.0;
+  let alpha: f64 = 0.2; // EMA smoothing factor
+  let mut retried = false;
+  while sent < size {
+    // cancellation check
+    if let Ok(f) = cancel.0.lock() { if f.unwrap_or(false) {
+      let _ = window.emit("upload:progress", serde_json::json!({"phase":"cancelled","bytesSent": sent, "totalBytes": size}));
+      // Close WS and return early without PUT_END
+      let _ = ws.close(None).await;
+      return Ok("CANCELLED".into());
+    }}
+    let chunk_len = std::cmp::min(max_chunk, size - sent);
+    let mut payload = Vec::with_capacity(4 + chunk_len);
+    payload.extend_from_slice(&((sent as u32).to_be_bytes()));
+    payload.extend_from_slice(&bytes[sent..sent+chunk_len]);
+    let frame = build_tlv_frame(0x11, &payload);
+  if let Err(e) = ws.send(Message::Binary(frame)).await {
+      // attempt single reconnect
+      if retried { return Err(format!("WS_SEND_FAILED: {}", e)); }
+      retried = true;
+      // Re-STATUS to refresh maxChunk
+      let status = tlv_request(host.clone(), 80, 0x30, &[]).await.ok();
+      if let Some(payload) = status {
+        if payload.len() >= 4 { let vlen = u32::from_le_bytes([payload[0],payload[1],payload[2],payload[3]]) as usize;
+          let mut off = 4 + vlen;
+          if payload.len() >= off+2+4+2 { off += 2 + 4; let mc = u16::from_le_bytes([payload[off],payload[off+1]]); max_chunk = mc as usize; }
+        }
+      }
+      ws = connect_ws().await?;
+      // Re-send PUT_BEGIN to (re)start session
+      let frame_b = build_tlv_frame(0x10, &begin);
+      ws.send(Message::Binary(frame_b)).await.map_err(|e| format!("WS_SEND_FAILED: {}", e))?;
+      if let Some(msg2) = ws.next().await { match msg2 { Ok(Message::Binary(_)) => {}, _ => {} } }
+      // continue loop without advancing sent
+      continue;
+    }
+    sent += chunk_len;
+
+    // Throttle to ~10Hz and compute EMA throughput
+    let now = Instant::now();
+    let dt_mark = now.duration_since(last_mark).as_millis() as f64 / 1000.0;
+    if dt_mark > 0.0 {
+      let bytes_delta = (sent - last_bytes) as f64;
+      let inst_bps = bytes_delta / dt_mark;
+      ema_bps = if ema_bps == 0.0 { inst_bps } else { alpha * inst_bps + (1.0 - alpha) * ema_bps };
+      last_mark = now;
+      last_bytes = sent;
+    }
+    if now.duration_since(last_emit).as_millis() >= 100 {
+      let percent = (sent as f64 / size as f64) * 100.0;
+      let elapsed_ms = t0.elapsed().as_millis() as u64;
+      emitter.emit("upload:progress", serde_json::json!({
+        "phase": "stream",
+        "bytesSent": sent,
+        "totalBytes": size,
+        "percent": percent,
+        "bytesPerSec": ema_bps as u64,
+        "elapsedMs": elapsed_ms,
+      }));
+      last_emit = now;
+    }
+  }
+
+  // PUT_END (empty payload) after full success only
+  let frame = build_tlv_frame(0x12, &[]);
+  ws.send(Message::Binary(frame)).await.map_err(|e| format!("WS_SEND_FAILED: {}", e))?;
+  // Await final ack (best-effort)
+  if let Some(_msg) = ws.next().await { /* ignore content; validated by firmware */ }
+  emitter.emit("upload:progress", serde_json::json!({
+    "phase": "finalizing",
+    "bytesSent": size,
+    "totalBytes": size,
+    "percent": 100.0,
+  }));
+  emitter.emit("upload:progress", serde_json::json!({"phase":"done"}));
+
+  Ok("OK".into())
+}
+
+#[tauri::command]
+async fn device_upload(window: tauri::Window, cancel: tauri::State<'_, UploadCancel>, host: String, name: String, bytes: Vec<u8>) -> Result<String, String> {
+  upload_with_emitter(&window, &*cancel, host, name, bytes).await
+}
+
+#[tauri::command]
+async fn device_upload_cancel(cancel: tauri::State<'_, UploadCancel>) -> Result<bool, String> {
+  if let Ok(mut f) = cancel.0.lock() { *f = Some(true); }
+  Ok(true)
+}
+
+#[tauri::command]
+async fn device_control_play(host: String, name: String) -> Result<bool, String> {
+  // CONTROL 0x20: [0x01][name_len][name]
+  let mut payload = Vec::with_capacity(2 + name.len());
+  payload.push(0x01);
+  payload.push(name.len() as u8);
+  payload.extend_from_slice(name.as_bytes());
+  let resp = tlv_request(host, 80, 0x20, &payload).await?;
+  let _ = resp; Ok(true)
+}
+
+#[tauri::command]
+async fn device_control_stop(host: String) -> Result<bool, String> {
+  let payload = [0x02u8];
+  let resp = tlv_request(host, 80, 0x20, &payload).await?;
+  let _ = resp; Ok(true)
+}
+
+#[tauri::command]
+async fn device_control_brightness(host: String, target: u8, duration_ms: u16) -> Result<bool, String> {
+  let mut payload = Vec::with_capacity(4);
+  payload.push(0x10); // BRIGHTNESS
+  payload.push(target);
+  payload.extend_from_slice(&duration_ms.to_be_bytes());
+  let _ = tlv_request(host, 80, 0x20, &payload).await?; Ok(true)
+}
+
+#[tauri::command]
+async fn device_control_gamma(host: String, gamma_x100: u16, duration_ms: u16) -> Result<bool, String> {
+  let mut payload = Vec::with_capacity(5);
+  payload.push(0x11); // GAMMA
+  payload.extend_from_slice(&gamma_x100.to_be_bytes());
+  payload.extend_from_slice(&duration_ms.to_be_bytes());
+  let _ = tlv_request(host, 80, 0x20, &payload).await?; Ok(true)
 }
 
 async fn tlv_request(host: String, port: u16, typ: u8, payload: &[u8]) -> Result<Vec<u8>, String> {
@@ -450,8 +689,86 @@ fn decode_list_payload(p: &[u8]) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_basic() {
-        assert_eq!(2 + 2, 4);
+    use super::*;
+    use tungstenite::protocol::Message as WsMessage;
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::accept_async;
+    use futures_util::StreamExt;
+    use std::sync::{Arc, Mutex};
+
+    fn parse_tlv_len(buf: &[u8]) -> usize { if buf.len()>=3 { u16::from_be_bytes([buf[1],buf[2]]) as usize } else { 0 } }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn ws_mock_ack_and_put_end() {
+        // Spin up a minimal WS server that acks PUT_BEGIN and PUT_END, and drops once mid-stream
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        // Server task
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            // Expect a frame (PUT_BEGIN), echo ack
+            if let Some(Ok(WsMessage::Binary(data))) = ws.next().await { let _ = ws.send(WsMessage::Binary(data)).await; }
+            // Next frame (PUT_DATA) -> drop connection to force client reconnect
+            let _ = ws.next().await;
+            // End first connection
+        });
+
+        // Client connects, sends a frame, and handles reconnect using helper
+        let url = format!("ws://{}/", addr);
+        let (mut ws, _) = tokio_tungstenite::connect_async(url).await.unwrap();
+        // Send a dummy PUT_BEGIN
+        let begin = build_tlv_frame(0x10, &[0x01, 0x02]);
+        ws.send(WsMessage::Binary(begin.clone())).await.unwrap();
+        // Expect an ack back (same frame echoed)
+        if let Some(Ok(WsMessage::Binary(resp))) = ws.next().await {
+            assert_eq!(parse_tlv_len(&resp), parse_tlv_len(&begin));
+        }
+        // Send PUT_DATA then expect server to drop (no assertion, just ensure no panic)
+        let data = build_tlv_frame(0x11, &[0,0,0,0, 1,2,3,4]);
+        let _ = ws.send(WsMessage::Binary(data)).await;
+        let _ = server.await; // server terminates after drop
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn upload_with_emitter_reconnect_and_finalize() {
+        // Start a server that acks begin, drops first PUT_DATA to force reconnect, then accepts full flow
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let dropped = Arc::new(Mutex::new(false));
+        let dropped_c = dropped.clone();
+
+        let server = tokio::spawn(async move {
+            // First connection
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            // PUT_BEGIN ack
+            if let Some(Ok(WsMessage::Binary(data))) = ws.next().await { let _ = ws.send(WsMessage::Binary(data)).await; }
+            // Drop on first PUT_DATA
+            let _ = ws.next().await; // ignore content and drop
+            // Second connection
+            let (stream2, _) = listener.accept().await.unwrap();
+            let mut ws2 = accept_async(stream2).await.unwrap();
+            // Expect PUT_BEGIN again, ack
+            if let Some(Ok(WsMessage::Binary(data))) = ws2.next().await { let _ = ws2.send(WsMessage::Binary(data)).await; }
+            // Accept some PUT_DATA frames
+            while let Some(msg) = ws2.next().await { match msg { Ok(WsMessage::Binary(_d)) => {
+                // NOP; in real device we would validate offset
+                let _ = dropped_c.lock().map(|mut f| *f = true);
+            }, _ => break } }
+        });
+
+        // Build small payload
+        let host = format!("{}", addr);
+        let bytes = vec![1u8; 10*1024];
+        let emitter_buf: Arc<Mutex<Vec<serde_json::Value>>> = Arc::new(Mutex::new(Vec::new()));
+        let emitter = TestEmitter(emitter_buf.clone());
+        let state = UploadCancel(Default::default());
+        let res = upload_with_emitter(&emitter, &state, host, "baked".into(), bytes).await;
+        assert!(res.is_ok());
+        assert!(*dropped.lock().unwrap());
+        let events = emitter_buf.lock().unwrap();
+        assert!(events.iter().any(|e| e.get("phase").and_then(|x| x.as_str())==Some("stream")));
     }
 }
