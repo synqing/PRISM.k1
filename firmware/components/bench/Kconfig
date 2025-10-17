@@ -1,0 +1,68 @@
+menu "PRISM Decode Bench"
+
+config PRISM_BENCH_AUTORUN
+    bool "Auto-run decode bench at boot"
+    default n
+    help
+        If enabled, the decode benchmark harness starts automatically at boot
+        and runs for the configured number of frames.
+
+config PRISM_BENCH_FRAMES
+    int "Number of frames to run"
+    range 1 8192
+    default 480
+    help
+        Total frames to benchmark before printing summary JSON.
+
+config PRISM_BENCH_LED_COUNT
+    int "LED count per channel"
+    range 1 1024
+    default 160
+    help
+        Number of LEDs processed per frame (affects workload size).
+
+config PRISM_BENCH_PERIOD_US
+    int "Target frame period (microseconds)"
+    range 1000 50000
+    default 8333
+    help
+        Frame cadence period in microseconds. 8333 ~= 120 FPS.
+
+config PRISM_BENCH_ENABLE_FILE
+    bool "Write JSON summary to file"
+    default n
+    help
+        If enabled, the harness attempts to write a JSON summary to the
+        configured file path after completion.
+
+config PRISM_BENCH_FILE_PATH
+    string "Metrics file path"
+    depends on PRISM_BENCH_ENABLE_FILE
+    default "/spiffs/bench_decode.jsonl"
+    help
+        File path for JSON summary output. Ensure filesystem is mounted.
+
+config PRISM_BENCH_REGISTER_CLI
+    bool "Register console command"
+    default y
+    help
+        Registers a console command `bench_decode` to run the benchmark at
+        runtime with optional overrides for pattern, frames, LED count, and
+        frame period.
+
+choice PRISM_BENCH_PATTERN
+    prompt "Decode workload pattern"
+    default PRISM_BENCH_PATTERN_PALETTE
+
+config PRISM_BENCH_PATTERN_PALETTE
+    bool "Palette + indices"
+
+config PRISM_BENCH_PATTERN_XOR_DELTA
+    bool "XOR delta stream"
+
+config PRISM_BENCH_PATTERN_RLE
+    bool "RLE bursts"
+
+endchoice
+
+endmenu

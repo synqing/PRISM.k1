@@ -1,0 +1,64 @@
+{
+  "data": {
+    "base": {
+      "color_format": 1,
+      "compression": 0,
+      "crc32": 3202227542,
+      "crc32_hex": "0xBEDE1D56",
+      "fps": 120,
+      "frame_count": 96,
+      "led_count": 160,
+      "magic": "PRSM",
+      "reserved1": 0,
+      "version": 257
+    },
+    "description": "Vector with mismatched extended metadata length to force parse error.",
+    "expected": {
+      "outcome": "length-error"
+    },
+    "extra": {
+      "fields": {
+        "experimental_hint": "should-be-ignored",
+        "palette_id": "sunrise-inline",
+        "ramp_space": "oklab",
+        "show_params": {
+          "gamma": 2.0
+        }
+      },
+      "length": 128,
+      "recognised_fields": [
+        "palette_id",
+        "ramp_space",
+        "show_params"
+      ],
+      "unknown_fields": [
+        "experimental_hint"
+      ]
+    },
+    "meta": {
+      "motion_direction": 1,
+      "params": [
+        120,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "reserved": 0,
+      "sync_mode": 2,
+      "version": 1
+    },
+    "notes": "Extended metadata truncated relative to length.",
+    "tags": [
+      "mutation",
+      "length"
+    ]
+  },
+  "meta": {
+    "category": "mutations",
+    "expected_outcome": "length-error",
+    "vector": "truncated_extended_metadata"
+  },
+  "version": "1.0"
+}

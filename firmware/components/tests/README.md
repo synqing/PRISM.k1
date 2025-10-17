@@ -27,6 +27,31 @@ idf.py flash
 idf.py monitor
 ```
 
+### Alternative: Dedicated Unity Test App
+
+For a clean test harness that only runs Unity tests (and prints results immediately), use the dedicated test app and helper script:
+
+```bash
+# Build test-only app and run (pass your serial port to flash+monitor)
+firmware/tools/run_unity_tests.sh /dev/tty.usbserial-XXXX
+
+# Or build only
+firmware/tools/run_unity_tests.sh
+```
+
+Manual steps for the test app:
+
+```bash
+cd firmware/test_all_app
+idf.py build
+idf.py -p /dev/tty.usbserial-XXXX flash monitor
+```
+
+Notes:
+- Requires ESP-IDF tools configured (IDF_PATH, toolchain in PATH)
+- Target: esp32s3 (matches main project)
+- The app includes all components under `../components`, so Unity tests in `components/tests` run automatically
+
 ### Test Menu
 
 When firmware boots, you can run specific tests:

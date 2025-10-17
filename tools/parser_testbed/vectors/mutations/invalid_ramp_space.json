@@ -1,0 +1,61 @@
+{
+  "data": {
+    "base": {
+      "color_format": 1,
+      "compression": 0,
+      "crc32": 3202227542,
+      "crc32_hex": "0xBEDE1D56",
+      "fps": 120,
+      "frame_count": 96,
+      "led_count": 160,
+      "magic": "PRSM",
+      "reserved1": 0,
+      "version": 257
+    },
+    "description": "Optional metadata includes an invalid ramp_space enum member.",
+    "expected": {
+      "outcome": "invalid-ramp-space"
+    },
+    "extra": {
+      "fields": {
+        "palette_id": "lab-test",
+        "ramp_space": "xyz",
+        "show_params": {
+          "gamma": 1.65
+        }
+      },
+      "length": 79,
+      "recognised_fields": [
+        "palette_id",
+        "ramp_space",
+        "show_params"
+      ],
+      "unknown_fields": []
+    },
+    "meta": {
+      "motion_direction": 1,
+      "params": [
+        120,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "reserved": 0,
+      "sync_mode": 2,
+      "version": 1
+    },
+    "notes": "Ramp space deliberately invalid for fallback behaviour.",
+    "tags": [
+      "mutation",
+      "enum"
+    ]
+  },
+  "meta": {
+    "category": "mutations",
+    "expected_outcome": "invalid-ramp-space",
+    "vector": "invalid_ramp_space"
+  },
+  "version": "1.0"
+}

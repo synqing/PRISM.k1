@@ -1,0 +1,15 @@
+[
+  "tools/tests/test_check_deps.py::CheckDepsTests::test_main_success",
+  "tools/tests/test_check_deps.py::CheckDepsTests::test_missing_cli_dependency_raises",
+  "tools/tests/test_check_deps.py::CheckDepsTests::test_missing_python_dependency_raises",
+  "tools/tests/test_parser_testbed.py::test_build_and_parse_roundtrip",
+  "tools/tests/test_parser_testbed.py::test_runner_cli_generates_and_regresses",
+  "tools/tests/test_parser_testbed.py::test_runner_cli_inspect",
+  "tools/tests/test_parser_testbed.py::test_validate_artifact_crc_failure",
+  "tools/tests/test_parser_testbed.py::test_validate_artifact_success",
+  "tools/tests/test_parser_testbed.py::test_validate_vector_outcomes",
+  "tools/tests/test_show_engine_core.py::test_clamp_bounds",
+  "tools/tests/test_show_engine_core.py::test_generate_frames_deterministic",
+  "tools/tests/test_show_engine_core.py::test_get_easing_function",
+  "tools/tests/test_show_engine_core.py::test_palette_lookup_sampling_basic"
+]

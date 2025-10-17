@@ -129,7 +129,8 @@
 		"/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/joltwallet__littlefs/cmake_install.cmake",
 		"/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/storage/cmake_install.cmake",
 		"/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/playback/cmake_install.cmake",
-		"/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/main/cmake_install.cmake"
+		"/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/main/cmake_install.cmake",
+		"/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

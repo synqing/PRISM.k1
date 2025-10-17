@@ -915,3 +915,10 @@
 /Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/main/CMakeFiles/install.dir
 /Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/main/CMakeFiles/install/local.dir
 /Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/main/CMakeFiles/install/strip.dir
+/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/CMakeFiles/__idf_bench.dir
+/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/CMakeFiles/edit_cache.dir
+/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/CMakeFiles/rebuild_cache.dir
+/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/CMakeFiles/list_install_components.dir
+/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/CMakeFiles/install.dir
+/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/CMakeFiles/install/local.dir
+/Users/spectrasynq/Workspace_Management/Software/PRISM.k1/firmware/test_temporal_app/build/esp-idf/bench/CMakeFiles/install/strip.dir

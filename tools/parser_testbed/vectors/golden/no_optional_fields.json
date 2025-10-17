@@ -1,0 +1,50 @@
+{
+  "data": {
+    "base": {
+      "color_format": 1,
+      "compression": 0,
+      "crc32": 3202227542,
+      "crc32_hex": "0xBEDE1D56",
+      "fps": 120,
+      "frame_count": 96,
+      "led_count": 160,
+      "magic": "PRSM",
+      "reserved1": 0,
+      "version": 257
+    },
+    "description": "Header with no extended metadata to assert defaults apply.",
+    "expected": {
+      "outcome": "pass"
+    },
+    "extra": {
+      "fields": {},
+      "length": 0,
+      "recognised_fields": [],
+      "unknown_fields": []
+    },
+    "meta": {
+      "motion_direction": 1,
+      "params": [
+        120,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "reserved": 0,
+      "sync_mode": 2,
+      "version": 1
+    },
+    "tags": [
+      "golden",
+      "defaults"
+    ]
+  },
+  "meta": {
+    "category": "golden",
+    "expected_outcome": "pass",
+    "vector": "no_optional_fields"
+  },
+  "version": "1.0"
+}

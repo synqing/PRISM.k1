@@ -179,3 +179,4 @@ $<TARGET_FILE:__idf_storage>
 $<TARGET_FILE:__idf_joltwallet__littlefs>
 $<TARGET_FILE:idf::playback>
 $<TARGET_FILE:idf::main>
+$<TARGET_FILE:idf::bench>

@@ -124,33 +124,43 @@ Validation:
 - Mismatch triggers error response and session abort
 ```
 
-### 2.2 Control Messages (0x20-0x21)
+### 2.2 Control Messages (0x20)
 
-**CONTROL_PLAY (0x20)**: Start playback with pattern
+All CONTROL messages use TYPE 0x20 with a first byte `command`, followed by command-specific params.
+
+Ack: On success, server replies with STATUS (0x30) payload `[status_code:1][message:N-1]` where `status_code=0x00` and the message is a short ASCII string summarizing the action (e.g., `"PLAY started"`, `"brightness=128 dur_ms=500"`). On validation failures or internal errors, server replies with ERROR (0xFF) `[error_code:1][message:N-1]`.
+
+Defined subcommands:
+
+**PLAY (command=0x01)**: Start playback
 ```
 TYPE:     0x20
-LENGTH:   2 bytes
-PAYLOAD:  [pattern_id:2]
-CRC32:    4 bytes
-
-Action:
-- Load pattern from storage (Task 5)
-- Start LED playback (Task 8)
-- Send STATUS response
+PAYLOAD:  [0x01][name_len:1][name:name_len]
 ```
+Action (MVP): Starts built-in palette cycle; name is reserved for future storage-backed playback.
 
-**CONTROL_STOP (0x21)**: Stop current playback
-```
-TYPE:     0x21
-LENGTH:   0 bytes
-PAYLOAD:  (none)
-CRC32:    4 bytes
+Success STATUS example: `[0x00]["PLAY started"]`
 
-Action:
-- Stop LED playback (Task 8)
-- Clear pattern from RAM cache (Task 7)
-- Send STATUS response
+**STOP (command=0x02)**: Stop playback
 ```
+TYPE:     0x20
+PAYLOAD:  [0x02]
+```
+Success STATUS example: `[0x00]["STOP ok"]`
+
+**BRIGHTNESS (command=0x10)**: Set global brightness with ramp
+```
+TYPE:     0x20
+PAYLOAD:  [0x10][target:1][duration_ms:2 big-endian]
+```
+Success STATUS example: `[0x00]["brightness=128 dur_ms=500"]`
+
+**GAMMA (command=0x11)**: Set gamma (x100) with ramp
+```
+TYPE:     0x20
+PAYLOAD:  [0x11][gamma_x100:2 big-endian][duration_ms:2 big-endian]
+```
+Success STATUS example: `[0x00]["gamma_x100=220 dur_ms=500"]`
 
 ### 2.3 Status & Error Messages (0x30, 0xFF)
 

@@ -1,0 +1,1 @@
+:root{color-scheme:light dark;--bg: #0b0b0c;--fg: #eaeaea}html,body,#root{height:100%}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:var(--bg);color:var(--fg)}h1{margin:0 0 8px;font-size:24px}p{margin:0;opacity:.85}

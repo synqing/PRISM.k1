@@ -1,0 +1,62 @@
+{
+  "data": {
+    "base": {
+      "color_format": 1,
+      "compression": 0,
+      "crc32": 3202227542,
+      "crc32_hex": "0xBEDE1D56",
+      "fps": 120,
+      "frame_count": 96,
+      "led_count": 160,
+      "magic": "PRSM",
+      "reserved1": 0,
+      "version": 257
+    },
+    "description": "Metadata change within CRC coverage to ensure detection.",
+    "expected": {
+      "outcome": "crc-mismatch"
+    },
+    "extra": {
+      "fields": {
+        "palette_id": "sunset-v1",
+        "ramp_space": "hsluv",
+        "show_params": {
+          "brightness": 0.85,
+          "gamma": 1.8
+        }
+      },
+      "length": 101,
+      "recognised_fields": [
+        "palette_id",
+        "ramp_space",
+        "show_params"
+      ],
+      "unknown_fields": []
+    },
+    "meta": {
+      "motion_direction": 1,
+      "params": [
+        120,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "reserved": 0,
+      "sync_mode": 10,
+      "version": 1
+    },
+    "notes": "Metadata byte flipped; CRC should detect change.",
+    "tags": [
+      "mutation",
+      "crc"
+    ]
+  },
+  "meta": {
+    "category": "mutations",
+    "expected_outcome": "crc-mismatch",
+    "vector": "meta_bitflip_crc"
+  },
+  "version": "1.0"
+}

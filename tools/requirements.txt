@@ -1,0 +1,4 @@
+hsluv==5.0.4            # HSLuv conversions for palette interpolation
+rgbw-colorspace-converter==0.1.4  # RGB↔RGBW conversions
+colr==0.9.1             # ANSI colour handling for previews
+ansi2html==1.9.2        # ANSI → HTML fallback renderer

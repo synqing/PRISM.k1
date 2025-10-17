@@ -35001,6 +35001,165 @@
                     {
                         "children": [],
                         "depends_on": null,
+                        "help": "If enabled, the decode benchmark harness starts automatically at boot\nand runs for the configured number of frames.",
+                        "id": "PRISM_BENCH_AUTORUN",
+                        "name": "PRISM_BENCH_AUTORUN",
+                        "range": null,
+                        "title": "Auto-run decode bench at boot",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Total frames to benchmark before printing summary JSON.",
+                        "id": "PRISM_BENCH_FRAMES",
+                        "name": "PRISM_BENCH_FRAMES",
+                        "range": [
+                            1,
+                            8192
+                        ],
+                        "title": "Number of frames to run",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Number of LEDs processed per frame (affects workload size).",
+                        "id": "PRISM_BENCH_LED_COUNT",
+                        "name": "PRISM_BENCH_LED_COUNT",
+                        "range": [
+                            1,
+                            1024
+                        ],
+                        "title": "LED count per channel",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Frame cadence period in microseconds. 8333 ~= 120 FPS.",
+                        "id": "PRISM_BENCH_PERIOD_US",
+                        "name": "PRISM_BENCH_PERIOD_US",
+                        "range": [
+                            1000,
+                            50000
+                        ],
+                        "title": "Target frame period (microseconds)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [
+                            {
+                                "children": [],
+                                "depends_on": "PRISM_BENCH_ENABLE_FILE",
+                                "help": "File path for JSON summary output. Ensure filesystem is mounted.",
+                                "id": "PRISM_BENCH_FILE_PATH",
+                                "name": "PRISM_BENCH_FILE_PATH",
+                                "range": null,
+                                "title": "Metrics file path",
+                                "type": "string"
+                            }
+                        ],
+                        "depends_on": null,
+                        "help": "If enabled, the harness attempts to write a JSON summary to the\nconfigured file path after completion.",
+                        "id": "PRISM_BENCH_ENABLE_FILE",
+                        "name": "PRISM_BENCH_ENABLE_FILE",
+                        "range": null,
+                        "title": "Write JSON summary to file",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Registers a console command `bench_decode` to run the benchmark at\nruntime with optional overrides for pattern, frames, LED count, and\nframe period.",
+                        "id": "PRISM_BENCH_REGISTER_CLI",
+                        "name": "PRISM_BENCH_REGISTER_CLI",
+                        "range": null,
+                        "title": "Register console command",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [
+                            {
+                                "children": [],
+                                "depends_on": "<choice PRISM_BENCH_PATTERN> && <choice PRISM_BENCH_PATTERN>",
+                                "help": null,
+                                "id": "PRISM_BENCH_PATTERN_PALETTE",
+                                "name": "PRISM_BENCH_PATTERN_PALETTE",
+                                "range": null,
+                                "title": "Palette + indices",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "<choice PRISM_BENCH_PATTERN> && <choice PRISM_BENCH_PATTERN>",
+                                "help": null,
+                                "id": "PRISM_BENCH_PATTERN_XOR_DELTA",
+                                "name": "PRISM_BENCH_PATTERN_XOR_DELTA",
+                                "range": null,
+                                "title": "XOR delta stream",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "<choice PRISM_BENCH_PATTERN> && <choice PRISM_BENCH_PATTERN>",
+                                "help": null,
+                                "id": "PRISM_BENCH_PATTERN_RLE",
+                                "name": "PRISM_BENCH_PATTERN_RLE",
+                                "range": null,
+                                "title": "RLE bursts",
+                                "type": "bool"
+                            }
+                        ],
+                        "depends_on": null,
+                        "help": null,
+                        "id": "component-config-prism-decode-bench-decode-workload-pattern-Users-spectrasynq-Workspace_Management-Software-PRISM.k1-firmware-components-bench-Kconfig-53",
+                        "name": "PRISM_BENCH_PATTERN",
+                        "title": "Decode workload pattern",
+                        "type": "choice"
+                    }
+                ],
+                "depends_on": null,
+                "id": "component-config-prism-decode-bench-Users-spectrasynq-Workspace_Management-Software-PRISM.k1-firmware-components-bench-Kconfig-1",
+                "title": "PRISM Decode Bench",
+                "type": "menu"
+            },
+            {
+                "children": [
+                    {
+                        "children": [
+                            {
+                                "children": [],
+                                "depends_on": "PRISM_PROFILE_TEMPORAL",
+                                "help": "Collect data cache hit/miss counters using PMU (D_ACCESS_U1).\nAdds two performance counters when enabled.",
+                                "id": "PRISM_PROFILE_COUNT_DCACHE",
+                                "name": "PRISM_PROFILE_COUNT_DCACHE",
+                                "range": null,
+                                "title": "Profile DCache hit/miss rates",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "PRISM_PROFILE_TEMPORAL",
+                                "help": "Collect instruction cache hit/miss counters using PMU (I_MEM).\nAdds two performance counters when enabled.",
+                                "id": "PRISM_PROFILE_COUNT_ICACHE",
+                                "name": "PRISM_PROFILE_COUNT_ICACHE",
+                                "range": null,
+                                "title": "Profile ICache hit/miss rates",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "PRISM_PROFILE_TEMPORAL",
+                                "help": "Collect successfully retired instruction count. May be skipped at\nruntime if all PMU counters are used by cache profiling.",
+                                "id": "PRISM_PROFILE_COUNT_INSN",
+                                "name": "PRISM_PROFILE_COUNT_INSN",
+                                "range": null,
+                                "title": "Profile instruction count (INSN)",
+                                "type": "bool"
+                            }
+                        ],
+                        "depends_on": null,
                         "help": "Enable cycle-accurate profiling of temporal calculations.\nAdds small code size overhead. Disable in production.",
                         "id": "PRISM_PROFILE_TEMPORAL",
                         "name": "PRISM_PROFILE_TEMPORAL",
@@ -35012,6 +35171,85 @@
                 "depends_on": null,
                 "id": "component-config-prism-playback-configuration-Users-spectrasynq-Workspace_Management-Software-PRISM.k1-firmware-components-playback-Kconfig-1",
                 "title": "PRISM Playback Configuration",
+                "type": "menu"
+            },
+            {
+                "children": [
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Adds a JSON endpoint /metrics/wave to the captive portal HTTP server\nthat returns the current WAVE profiling statistics.",
+                        "id": "PRISM_METRICS_HTTP",
+                        "name": "PRISM_METRICS_HTTP",
+                        "range": null,
+                        "title": "Expose profiling metrics via HTTP endpoint",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Registers a console command `prism_metrics` to print current metrics.",
+                        "id": "PRISM_METRICS_CLI",
+                        "name": "PRISM_METRICS_CLI",
+                        "range": null,
+                        "title": "Expose profiling metrics via CLI command",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "PRISM_METRICS_HTTP",
+                        "help": "Adds a text/plain Prometheus exposition endpoint at /metrics.",
+                        "id": "PRISM_METRICS_PROMETHEUS",
+                        "name": "PRISM_METRICS_PROMETHEUS",
+                        "range": null,
+                        "title": "Expose Prometheus text endpoint (/metrics)",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "PRISM_METRICS_HTTP",
+                        "help": "Adds a CSV snapshot endpoint for simple scripting.",
+                        "id": "PRISM_METRICS_CSV",
+                        "name": "PRISM_METRICS_CSV",
+                        "range": null,
+                        "title": "Expose CSV endpoint (/metrics.csv)",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [
+                            {
+                                "children": [],
+                                "depends_on": "PRISM_METRICS_PUSH",
+                                "help": null,
+                                "id": "PRISM_METRICS_PUSH_URL",
+                                "name": "PRISM_METRICS_PUSH_URL",
+                                "range": null,
+                                "title": "Metrics push URL (e.g., http://host:port/api/metrics)",
+                                "type": "string"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "PRISM_METRICS_PUSH",
+                                "help": null,
+                                "id": "PRISM_METRICS_PUSH_INTERVAL_SEC",
+                                "name": "PRISM_METRICS_PUSH_INTERVAL_SEC",
+                                "range": null,
+                                "title": "Metrics push interval (seconds)",
+                                "type": "int"
+                            }
+                        ],
+                        "depends_on": null,
+                        "help": "When enabled, a background task will POST JSON metrics to the URL\nconfigured below at the specified interval.",
+                        "id": "PRISM_METRICS_PUSH",
+                        "name": "PRISM_METRICS_PUSH",
+                        "range": null,
+                        "title": "Periodically push metrics to HTTP endpoint",
+                        "type": "bool"
+                    }
+                ],
+                "depends_on": null,
+                "id": "component-config-prism-metrics-exposure-Users-spectrasynq-Workspace_Management-Software-PRISM.k1-firmware-components-playback-Kconfig-36",
+                "title": "PRISM Metrics Exposure",
                 "type": "menu"
             },
             {
