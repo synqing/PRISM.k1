@@ -1,40 +1,36 @@
-#!/bin/bash
-# .githooks/pre-commit
-#
-# CANON.md Protection Hook
-# Prevents manual edits to CANON.md
-# Enforces that CANON.md is only modified via generate-canon.sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+# Block large files (>50MB) unless managed by Git LFS
+limit=$((50*1024*1024))
+fail=0
 
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# Check if CANON.md is being committed
-if git diff --cached --name-only | grep -q ".taskmaster/CANON.md"; then
-    # Check if this is an auto-generated commit
-    if ! git log --format=%B -n 1 | grep -q "\[AUTO\]"; then
-        echo -e "${RED}✗ BLOCKED: Manual edit to CANON.md detected!${NC}"
-        echo ""
-        echo "CANON.md must ONLY be generated via scripts/generate-canon.sh"
-        echo ""
-        echo "To fix:"
-        echo "  1. Unstage CANON.md: git reset HEAD .taskmaster/CANON.md"
-        echo "  2. Revert manual changes: git checkout .taskmaster/CANON.md"
-        echo "  3. If you need to change specifications:"
-        echo "     a. Create/modify an ADR in .taskmaster/decisions/"
-        echo "     b. Run: ./scripts/generate-canon.sh"
-        echo "     c. Commit with message: '[AUTO] Generated CANON from ADRs'"
-        echo ""
-        exit 1
+staged=$(git diff --cached --name-only -z)
+if [[ -n "$staged" ]]; then
+  while IFS= read -r -d '' path; do
+    # Skip deletions
+    if ! git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+      continue
     fi
+    sha1=$(git rev-parse :"$path" 2>/dev/null || true)
+    if [[ -z "$sha1" ]]; then
+      continue
+    fi
+    size=$(git cat-file -s "$sha1")
+    if [[ "$size" -gt "$limit" ]]; then
+      # Allow if tracked by LFS pointer
+      if git check-attr filter -- "$path" | grep -qi 'lfs'; then
+        continue
+      fi
+      echo "[pre-commit] Blocked: $path is $(numfmt --to=iec $size), exceeds 50MB and is not tracked by LFS" >&2
+      fail=1
+    fi
+  done < <(printf "%s" "$staged")
 fi
 
-# Check if ADRs are being committed
-if git diff --cached --name-only | grep -q ".taskmaster/decisions/"; then
-    echo -e "${YELLOW}ADR changes detected - remember to regenerate CANON.md${NC}"
-    echo "Run: ./scripts/generate-canon.sh"
+if [[ "$fail" -ne 0 ]]; then
+  echo "[pre-commit] Add large assets to Git LFS or reduce size." >&2
+  exit 1
 fi
 
 exit 0

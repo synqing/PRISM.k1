@@ -31,6 +31,18 @@ node_modules/
 # Local care packages and editor caches
 .cursor/
 
+# Build outputs and caches (firmware/studio)
+firmware/build/
+studio/src-tauri/target/
+out/
+dist/
+.cache/
+coverage/
+logs/
+
+# Other
+*.local
+
 # Task files
 # tasks.json
 # tasks/ 
