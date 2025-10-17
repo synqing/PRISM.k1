@@ -29,6 +29,7 @@ type ProjectState = {
   setLastBake: (stats: {
     fps: number; ledCount: number; frames: number; payloadSize: number; totalSize: number;
     ttflMs?: number; startedAt?: number | null; finishedAt?: number | null; throughputBps?: number;
+    geometryId?: string; palettePolicy?: 'host_lut' | 'device_blend';
   }) => void;
 };
 
@@ -219,6 +220,8 @@ export const useProjectStore = create<ProjectState>()(
                 startedAt: stats.startedAt ?? undefined as any,
                 finishedAt: stats.finishedAt ?? undefined as any,
                 throughputBps: stats.throughputBps ?? undefined,
+                geometryId: stats.geometryId ?? undefined,
+                palettePolicy: stats.palettePolicy ?? undefined,
               } as any;
               s.project.updatedAt = new Date().toISOString();
               s.isDirty = true;

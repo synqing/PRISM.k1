@@ -116,6 +116,8 @@ export const ProjectSchema = z.object({
       startedAt: z.number().int().nonnegative().optional(),
       finishedAt: z.number().int().nonnegative().optional(),
       throughputBps: z.number().int().nonnegative().optional(),
+      geometryId: z.string().optional(),
+      palettePolicy: z.enum(['host_lut','device_blend']).optional(),
     })
     .optional(),
 });

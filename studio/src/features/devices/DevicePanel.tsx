@@ -69,6 +69,8 @@ export default function DevicePanel() {
         startedAt: startedAt ?? null,
         finishedAt: finishedAt ?? null,
         throughputBps: upload.bytesPerSec,
+        geometryId,
+        palettePolicy: devicePaletteBlend ? 'device_blend' : 'host_lut',
       });
     }
   }, [upload.phase]);
