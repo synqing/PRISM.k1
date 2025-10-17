@@ -895,7 +895,7 @@
           "8",
           "9"
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -973,7 +973,7 @@
         "complexity": 6,
         "recommendedSubtasks": 3,
         "expansionPrompt": "Create `tools/validation/soak_playlist.ts` (or extend the existing Python soak tooling) to drive 50 Bake & Upload cycles via Playwright or a Tauri CLI hook against a loopback device stub that verifies CRC at PUT_END. Add Vitest performance tests ensuring the evaluator sustains 120 FPS for 2×160 LEDs (<16.7 ms/frame) on representative graphs. Document hardware‑in‑loop TTFL checks in `docs/validation/TTFL.md` with steps, expected telemetry, and recovery actions; wire the soak/perf runs into CI with artifact capture.",
-        "updatedAt": "2025-10-17T10:34:47.405Z"
+        "updatedAt": "2025-10-17T10:44:15.439Z"
       },
       {
         "id": "11",
@@ -1037,9 +1037,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-10-17T10:35:12.143Z",
+      "lastModified": "2025-10-17T10:44:15.440Z",
       "taskCount": 11,
-      "completedCount": 10,
+      "completedCount": 11,
       "tags": [
         "master"
       ]
