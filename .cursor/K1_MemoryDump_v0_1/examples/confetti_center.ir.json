@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "constants": [
+    0.6,
+    6,
+    0.85
+  ],
+  "palettes": [
+    {
+      "name": "Candy"
+    }
+  ],
+  "ops": [
+    {
+      "op": "SPAWN_CENTER",
+      "dst": 0,
+      "rate": 0
+    },
+    {
+      "op": "SMEAR_OUT",
+      "dst": 1,
+      "a": 0,
+      "steps": 1
+    },
+    {
+      "op": "PALETTEMAP",
+      "pal": 0,
+      "a": 1
+    },
+    {
+      "op": "MIX_COLOR",
+      "kidx": 2
+    },
+    {
+      "op": "OUTPUT"
+    }
+  ]
+}

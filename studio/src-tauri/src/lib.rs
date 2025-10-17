@@ -563,37 +563,45 @@ async fn device_upload_cancel(cancel: tauri::State<'_, UploadCancel>) -> Result<
 #[tauri::command]
 async fn device_control_play(host: String, name: String) -> Result<bool, String> {
   // CONTROL 0x20: [0x01][name_len][name]
+  const CONTROL_TYPE: u8 = 0x20;
+  const CTRL_PLAY: u8 = 0x01;
   let mut payload = Vec::with_capacity(2 + name.len());
-  payload.push(0x01);
+  payload.push(CTRL_PLAY);
   payload.push(name.len() as u8);
   payload.extend_from_slice(name.as_bytes());
-  let resp = tlv_request(host, 80, 0x20, &payload).await?;
+  let resp = tlv_request(host, 80, CONTROL_TYPE, &payload).await?;
   let _ = resp; Ok(true)
 }
 
 #[tauri::command]
 async fn device_control_stop(host: String) -> Result<bool, String> {
-  let payload = [0x02u8];
-  let resp = tlv_request(host, 80, 0x20, &payload).await?;
+  const CONTROL_TYPE: u8 = 0x20;
+  const CTRL_STOP: u8 = 0x02;
+  let payload = [CTRL_STOP];
+  let resp = tlv_request(host, 80, CONTROL_TYPE, &payload).await?;
   let _ = resp; Ok(true)
 }
 
 #[tauri::command]
 async fn device_control_brightness(host: String, target: u8, duration_ms: u16) -> Result<bool, String> {
+  const CONTROL_TYPE: u8 = 0x20;
+  const CTRL_BRIGHTNESS: u8 = 0x10;
   let mut payload = Vec::with_capacity(4);
-  payload.push(0x10); // BRIGHTNESS
+  payload.push(CTRL_BRIGHTNESS);
   payload.push(target);
   payload.extend_from_slice(&duration_ms.to_be_bytes());
-  let _ = tlv_request(host, 80, 0x20, &payload).await?; Ok(true)
+  let _ = tlv_request(host, 80, CONTROL_TYPE, &payload).await?; Ok(true)
 }
 
 #[tauri::command]
 async fn device_control_gamma(host: String, gamma_x100: u16, duration_ms: u16) -> Result<bool, String> {
+  const CONTROL_TYPE: u8 = 0x20;
+  const CTRL_GAMMA: u8 = 0x11;
   let mut payload = Vec::with_capacity(5);
-  payload.push(0x11); // GAMMA
+  payload.push(CTRL_GAMMA);
   payload.extend_from_slice(&gamma_x100.to_be_bytes());
   payload.extend_from_slice(&duration_ms.to_be_bytes());
-  let _ = tlv_request(host, 80, 0x20, &payload).await?; Ok(true)
+  let _ = tlv_request(host, 80, CONTROL_TYPE, &payload).await?; Ok(true)
 }
 
 async fn tlv_request(host: String, port: u16, typ: u8, payload: &[u8]) -> Result<Vec<u8>, String> {
@@ -659,13 +667,16 @@ fn decode_status_payload(p: &[u8]) -> serde_json::Value {
   if p.len() >= off+2 { led_count = read_u16_le(&p[off..off+2]); off += 2; }
   if p.len() >= off+4 { avail = read_u32_le(&p[off..off+4]); off += 4; }
   if p.len() >= off+2 { max_chunk = read_u16_le(&p[off..off+2]); off += 2; }
-  if p.len() >= off+1 { templates = p[off]; }
+  if p.len() >= off+1 { templates = p[off]; off += 1; }
+  let mut caps: Option<u32> = None;
+  if p.len() >= off+4 { caps = Some(read_u32_le(&p[off..off+4])); }
   serde_json::json!({
     "version": ver,
     "ledCount": led_count,
     "storageAvailable": avail,
     "maxChunk": max_chunk,
     "templateCount": templates,
+    "caps": caps,
   })
 }
 
@@ -770,5 +781,36 @@ mod tests {
         assert!(*dropped.lock().unwrap());
         let events = emitter_buf.lock().unwrap();
         assert!(events.iter().any(|e| e.get("phase").and_then(|x| x.as_str())==Some("stream")));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn put_end_has_empty_payload() {
+        // Server that inspects PUT_END and asserts zero-length payload
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            // Expect PUT_BEGIN, ack
+            if let Some(Ok(WsMessage::Binary(data))) = ws.next().await {
+                let _ = ws.send(WsMessage::Binary(data)).await;
+            }
+            // Expect PUT_END next (empty upload -> no DATA frames)
+            if let Some(Ok(WsMessage::Binary(data2))) = ws.next().await {
+                assert_eq!(data2[0], 0x12);
+                let len = u16::from_be_bytes([data2[1], data2[2]]);
+                assert_eq!(len, 0, "PUT_END payload must be empty");
+            }
+        });
+
+        // Upload empty bytes so client goes straight to PUT_END
+        let host = format!("{}", addr);
+        let emitter_buf: Arc<Mutex<Vec<serde_json::Value>>> = Arc::new(Mutex::new(Vec::new()));
+        let emitter = TestEmitter(emitter_buf.clone());
+        let state = UploadCancel(Default::default());
+        let res = upload_with_emitter(&emitter, &state, host, "baked".into(), vec![]).await;
+        assert!(res.is_ok());
+        let _ = server.await;
     }
 }

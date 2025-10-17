@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "constants": [
+    0.15,
+    0.03,
+    0.85
+  ],
+  "palettes": [
+    {
+      "name": "Aurora"
+    }
+  ],
+  "ops": [
+    {
+      "op": "RADIUS",
+      "dst": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "dst": 1,
+      "idx": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "dst": 2,
+      "idx": 1
+    },
+    {
+      "op": "SINE",
+      "dst": 3,
+      "a": 1
+    },
+    {
+      "op": "RING",
+      "dst": 4,
+      "radius": 0,
+      "phase": 3,
+      "width": 2
+    },
+    {
+      "op": "PALETTEMAP",
+      "pal": 0,
+      "a": 4
+    },
+    {
+      "op": "MIX_COLOR",
+      "kidx": 2
+    },
+    {
+      "op": "OUTPUT"
+    }
+  ]
+}

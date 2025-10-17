@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "constants": [
+    0.12,
+    0.17
+  ],
+  "palettes": [
+    {
+      "name": "Cosmic"
+    }
+  ],
+  "ops": [
+    {
+      "op": "LOAD_CONST",
+      "dst": 0,
+      "idx": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "dst": 1,
+      "idx": 1
+    },
+    {
+      "op": "SINE",
+      "dst": 2,
+      "a": 0
+    },
+    {
+      "op": "SINE",
+      "dst": 3,
+      "a": 1
+    },
+    {
+      "op": "ADD",
+      "dst": 4,
+      "a": 2,
+      "b": 3
+    },
+    {
+      "op": "PALETTEMAP",
+      "pal": 0,
+      "a": 4
+    },
+    {
+      "op": "OUTPUT"
+    }
+  ]
+}

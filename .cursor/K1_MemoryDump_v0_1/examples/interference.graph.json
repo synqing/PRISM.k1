@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "AngleField",
+      "params": {}
+    },
+    {
+      "id": "n2",
+      "type": "Phase",
+      "params": {
+        "speed": 0.12
+      }
+    },
+    {
+      "id": "n3",
+      "type": "Phase",
+      "params": {
+        "speed": 0.17
+      }
+    },
+    {
+      "id": "n4",
+      "type": "Sin",
+      "params": {}
+    },
+    {
+      "id": "n5",
+      "type": "Sin",
+      "params": {}
+    },
+    {
+      "id": "n6",
+      "type": "Add",
+      "params": {}
+    },
+    {
+      "id": "n7",
+      "type": "PaletteMap",
+      "params": {
+        "palette": "Cosmic"
+      }
+    },
+    {
+      "id": "out",
+      "type": "ToK1",
+      "params": {
+        "target": "k1-001.local",
+        "geometry": "K1_LGP_v1",
+        "color": {
+          "gamma": 2.2,
+          "brightnessLimit": 0.85,
+          "whiteBalance": [
+            1.0,
+            0.98,
+            1.04
+          ]
+        },
+        "publish": {
+          "mode": "program"
+        }
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": {
+        "node": "n2",
+        "socket": "phase"
+      },
+      "to": {
+        "node": "n4",
+        "socket": "in"
+      }
+    },
+    {
+      "from": {
+        "node": "n3",
+        "socket": "phase"
+      },
+      "to": {
+        "node": "n5",
+        "socket": "in"
+      }
+    },
+    {
+      "from": {
+        "node": "n4",
+        "socket": "out"
+      },
+      "to": {
+        "node": "n6",
+        "socket": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "n5",
+        "socket": "out"
+      },
+      "to": {
+        "node": "n6",
+        "socket": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "n6",
+        "socket": "out"
+      },
+      "to": {
+        "node": "n7",
+        "socket": "idx"
+      }
+    },
+    {
+      "from": {
+        "node": "n7",
+        "socket": "color"
+      },
+      "to": {
+        "node": "out",
+        "socket": "color"
+      }
+    }
+  ],
+  "macros": {
+    "Energy": 0.6,
+    "Decay": 0.5,
+    "HueShift": 0.0,
+    "Spread": 0.3
+  }
+}

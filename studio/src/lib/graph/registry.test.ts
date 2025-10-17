@@ -67,4 +67,45 @@ describe('graph registry samplers', () => {
       expect(g).toBe(b3);
     }
   });
+
+  it('AngleField increases monotonically across strip', () => {
+    const a = Registry.AngleField({}, {}, {});
+    const v0 = a(0,0)[0];
+    const v1 = a(160,0)[0];
+    const v2 = a(319,0)[0];
+    expect(v0).toBeLessThanOrEqual(v1);
+    expect(v1).toBeLessThanOrEqual(v2);
+  });
+
+  it('RadiusField is minimal at center and larger at edges', () => {
+    const r = Registry.RadiusField({}, {}, {});
+    const center = r(160,0)[0];
+    const edge = r(0,0)[0];
+    expect(center).toBeLessThan(edge);
+  });
+
+  it('SinOsc varies over time', () => {
+    const s = Registry.SinOsc({}, { freq: 1.0, spatial: 0.0, phase: 0 }, {});
+    const a = s(10, 0)[0];
+    const b = s(10, 0.25)[0];
+    expect(a).not.toBe(b);
+  });
+
+  it('Ring masks near radius', () => {
+    // Use a solid white source to test masking
+    const white = () => [255,255,255] as [number,number,number];
+    const ring = Registry.Ring({ src: white }, { radius: 0.0, width: 0.1 }, {});
+    const center = ring(160,0);
+    const far = ring(319,0);
+    expect(center[0]).toBeGreaterThanOrEqual(200);
+    expect(far[0]).toBe(0);
+  });
+
+  it('CenterOutMirror averages symmetric samples', () => {
+    const grad = (i:number)=> [i%256, i%256, i%256] as [number,number,number];
+    const mir = Registry.CenterOutMirror({ src: grad as any }, {}, {});
+    const a = mir(100,0);
+    const b = mir(219,0); // symmetric around center=160 -> 2*160-1=319; 319-100=219
+    expect(a).toEqual(b);
+  });
 });

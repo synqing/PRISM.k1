@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "RadiusField",
+      "params": {}
+    },
+    {
+      "id": "n2",
+      "type": "Phase",
+      "params": {
+        "speed": 0.15
+      }
+    },
+    {
+      "id": "n3",
+      "type": "Ring",
+      "params": {
+        "width": 0.03
+      }
+    },
+    {
+      "id": "n4",
+      "type": "Multiply",
+      "params": {
+        "k": 1.0
+      }
+    },
+    {
+      "id": "n5",
+      "type": "PaletteMap",
+      "params": {
+        "palette": "Aurora"
+      }
+    },
+    {
+      "id": "n6",
+      "type": "Fade",
+      "params": {
+        "amount": 0.85
+      }
+    },
+    {
+      "id": "out",
+      "type": "ToK1",
+      "params": {
+        "target": "k1-001.local",
+        "geometry": "K1_LGP_v1",
+        "color": {
+          "gamma": 2.2,
+          "brightnessLimit": 0.85,
+          "whiteBalance": [
+            1.0,
+            0.98,
+            1.04
+          ]
+        },
+        "publish": {
+          "mode": "program"
+        }
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": {
+        "node": "n2",
+        "socket": "phase"
+      },
+      "to": {
+        "node": "n3",
+        "socket": "phase"
+      }
+    },
+    {
+      "from": {
+        "node": "n1",
+        "socket": "scalar"
+      },
+      "to": {
+        "node": "n3",
+        "socket": "radius"
+      }
+    },
+    {
+      "from": {
+        "node": "n3",
+        "socket": "mask"
+      },
+      "to": {
+        "node": "n4",
+        "socket": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "n4",
+        "socket": "out"
+      },
+      "to": {
+        "node": "n5",
+        "socket": "idx"
+      }
+    },
+    {
+      "from": {
+        "node": "n5",
+        "socket": "color"
+      },
+      "to": {
+        "node": "n6",
+        "socket": "color"
+      }
+    },
+    {
+      "from": {
+        "node": "n6",
+        "socket": "color"
+      },
+      "to": {
+        "node": "out",
+        "socket": "color"
+      }
+    }
+  ],
+  "macros": {
+    "Energy": 0.6,
+    "Decay": 0.5,
+    "HueShift": 0.0,
+    "Spread": 0.3
+  }
+}

@@ -6,6 +6,14 @@ export type NodeKind =
   | 'Add'
   | 'Multiply'
   | 'PaletteMap'
+  | 'AngleField'
+  | 'RadiusField'
+  | 'SinOsc'
+  | 'PhaseAccum'
+  | 'DistCenter'
+  | 'Ring'
+  | 'Fade'
+  | 'CenterOutMirror'
   | 'ToK1';
 
 export type ParamValue = number | string;
@@ -28,4 +36,3 @@ export type Sampler = (i: number, t: number) => [number, number, number]; // led
 export interface CompileContext {
   lut?: Uint8Array; // 256*3 palette lookup (optional)
 }
-

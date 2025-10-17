@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "constants": [
+    0.8,
+    0.04,
+    0.9,
+    0.8
+  ],
+  "palettes": [
+    {
+      "name": "Ocean"
+    }
+  ],
+  "ops": [
+    {
+      "op": "RADIUS",
+      "dst": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "dst": 1,
+      "idx": 0
+    },
+    {
+      "op": "IMPULSE",
+      "dst": 2,
+      "rate": 1
+    },
+    {
+      "op": "LOAD_CONST",
+      "dst": 3,
+      "idx": 1
+    },
+    {
+      "op": "RING",
+      "dst": 4,
+      "radius": 0,
+      "phase": 2,
+      "width": 3
+    },
+    {
+      "op": "LOAD_CONST",
+      "dst": 5,
+      "idx": 2
+    },
+    {
+      "op": "MUL",
+      "dst": 6,
+      "a": 4,
+      "b": 5
+    },
+    {
+      "op": "PALETTEMAP",
+      "pal": 0,
+      "a": 6
+    },
+    {
+      "op": "LOAD_CONST",
+      "dst": 7,
+      "idx": 3
+    },
+    {
+      "op": "MIX_COLOR",
+      "kidx": 7
+    },
+    {
+      "op": "OUTPUT"
+    }
+  ]
+}

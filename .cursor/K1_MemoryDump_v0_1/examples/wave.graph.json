@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "AngleField",
+      "params": {}
+    },
+    {
+      "id": "n2",
+      "type": "AddScalar",
+      "params": {
+        "k": 0.0
+      }
+    },
+    {
+      "id": "n3",
+      "type": "Sin",
+      "params": {}
+    },
+    {
+      "id": "n4",
+      "type": "PaletteMap",
+      "params": {
+        "palette": "Sunset"
+      }
+    },
+    {
+      "id": "out",
+      "type": "ToK1",
+      "params": {
+        "target": "k1-001.local",
+        "geometry": "K1_LGP_v1",
+        "color": {
+          "gamma": 2.2,
+          "brightnessLimit": 0.85,
+          "whiteBalance": [
+            1.0,
+            0.98,
+            1.04
+          ]
+        },
+        "publish": {
+          "mode": "program"
+        }
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": {
+        "node": "n1",
+        "socket": "scalar"
+      },
+      "to": {
+        "node": "n2",
+        "socket": "in"
+      }
+    },
+    {
+      "from": {
+        "node": "n2",
+        "socket": "out"
+      },
+      "to": {
+        "node": "n3",
+        "socket": "in"
+      }
+    },
+    {
+      "from": {
+        "node": "n3",
+        "socket": "out"
+      },
+      "to": {
+        "node": "n4",
+        "socket": "idx"
+      }
+    },
+    {
+      "from": {
+        "node": "n4",
+        "socket": "color"
+      },
+      "to": {
+        "node": "out",
+        "socket": "color"
+      }
+    }
+  ],
+  "macros": {
+    "Energy": 0.6,
+    "Decay": 0.5,
+    "HueShift": 0.0,
+    "Spread": 0.3
+  }
+}

@@ -3,6 +3,76 @@ import type { Sampler, CompileContext } from './types';
 export type NodeCompiler = (inputs: Record<string, Sampler>, params: Record<string, any>, ctx: CompileContext) => Sampler;
 
 export const Registry: Record<string, NodeCompiler> = {
+  AngleField: () => {
+    return (i) => { const v = Math.round(iNorm(i) * 255); return [v,v,v]; };
+  },
+  RadiusField: () => {
+    return (i, _t) => {
+      const center = 160; const maxd = Math.max(1, center-1);
+      const d = Math.abs(i - center);
+      const v = Math.max(0, Math.min(255, Math.round((d / maxd) * 255)));
+      return [v,v,v];
+    };
+  },
+  SinOsc: (_inputs, params) => {
+    const freq = Number(params.freq ?? 0.5); // Hz
+    const spatial = Number(params.spatial ?? 1.0); // cycles along strip
+    const phase0 = Number(params.phase ?? 0);
+    return (i, t) => {
+      const x = iNorm(i);
+      const phase = phase0 + freq * t + spatial * x;
+      const s = Math.sin(2*Math.PI*phase);
+      const v = Math.max(0, Math.min(255, Math.round((s*0.5+0.5)*255)));
+      return [v,v,v];
+    };
+  },
+  PhaseAccum: (_inputs, params) => {
+    const speed = Number(params.speed ?? 0.2);
+    const offset = Number(params.offset ?? 0);
+    return (_i, t) => {
+      const f = ((speed * t + offset) % 1 + 1) % 1;
+      const v = Math.round(f * 255);
+      return [v,v,v];
+    };
+  },
+  DistCenter: () => {
+    return (i) => {
+      const center = 160; const maxd = Math.max(1, center-1);
+      const d = Math.abs(i - center);
+      const v = Math.max(0, Math.min(255, Math.round((d / maxd) * 255)));
+      return [v,v,v];
+    };
+  },
+  Ring: (inputs, params) => {
+    const src = inputs.src ?? (()=>[0,0,0]);
+    const radius = Number(params.radius ?? 0.3);
+    const width = Math.max(0.001, Number(params.width ?? 0.05));
+    return (i,t) => {
+      const center = 160; const maxd = Math.max(1, center-1);
+      const d = Math.abs(i - center) / maxd; // 0..1
+      const inBand = Math.abs(d - radius) <= width;
+      const [r,g,b] = src(i,t);
+      const mask = inBand ? 255 : 0;
+      return [Math.round(r*mask/255), Math.round(g*mask/255), Math.round(b*mask/255)];
+    };
+  },
+  Fade: (inputs, params) => {
+    const src = inputs.src ?? (()=>[0,0,0]);
+    const amount = Math.max(0, Math.min(1, Number(params.amount ?? 0.8)));
+    return (i,t) => {
+      const [r,g,b] = src(i,t);
+      return [Math.round(r*amount), Math.round(g*amount), Math.round(b*amount)];
+    };
+  },
+  CenterOutMirror: (inputs) => {
+    const src = inputs.src ?? (()=>[0,0,0]);
+    return (i,t) => {
+      const center = 160; const mirror = (2*center - 1) - i; // mirror index around center boundary
+      const A = src(i,t);
+      const B = src(Math.max(0, Math.min(mirror, 319)), t);
+      return [Math.round((A[0]+B[0])/2), Math.round((A[1]+B[1])/2), Math.round((A[2]+B[2])/2)];
+    };
+  },
   Noise2D: (_inputs, params) => {
     // Deterministic 2D value noise using integer hash; seedable
     const seed = Number(params.seed ?? 1337) | 0;

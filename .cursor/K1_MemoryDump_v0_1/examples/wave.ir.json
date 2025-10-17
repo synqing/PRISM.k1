@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "constants": [
+    6.2831853
+  ],
+  "palettes": [
+    {
+      "name": "Sunset"
+    }
+  ],
+  "ops": [
+    {
+      "op": "ANGLE",
+      "dst": 0
+    },
+    {
+      "op": "SINE",
+      "dst": 1,
+      "a": 0
+    },
+    {
+      "op": "PALETTEMAP",
+      "pal": 0,
+      "a": 1
+    },
+    {
+      "op": "OUTPUT"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "SpawnCenter",
+      "params": {
+        "rate": 0.6
+      }
+    },
+    {
+      "id": "n2",
+      "type": "SmearOutward",
+      "params": {
+        "steps": 6
+      }
+    },
+    {
+      "id": "n3",
+      "type": "PaletteMap",
+      "params": {
+        "palette": "Candy"
+      }
+    },
+    {
+      "id": "n4",
+      "type": "Fade",
+      "params": {
+        "amount": 0.85
+      }
+    },
+    {
+      "id": "out",
+      "type": "ToK1",
+      "params": {
+        "target": "k1-001.local",
+        "geometry": "K1_LGP_v1",
+        "color": {
+          "gamma": 2.2,
+          "brightnessLimit": 0.85,
+          "whiteBalance": [
+            1.0,
+            0.98,
+            1.04
+          ]
+        },
+        "publish": {
+          "mode": "program"
+        }
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": {
+        "node": "n1",
+        "socket": "mask"
+      },
+      "to": {
+        "node": "n2",
+        "socket": "in"
+      }
+    },
+    {
+      "from": {
+        "node": "n2",
+        "socket": "mask"
+      },
+      "to": {
+        "node": "n3",
+        "socket": "idx"
+      }
+    },
+    {
+      "from": {
+        "node": "n3",
+        "socket": "color"
+      },
+      "to": {
+        "node": "n4",
+        "socket": "color"
+      }
+    },
+    {
+      "from": {
+        "node": "n4",
+        "socket": "color"
+      },
+      "to": {
+        "node": "out",
+        "socket": "color"
+      }
+    }
+  ],
+  "macros": {
+    "Energy": 0.6,
+    "Decay": 0.5,
+    "HueShift": 0.0,
+    "Spread": 0.3
+  }
+}
