@@ -1,0 +1,501 @@
+/**
+ * @file pattern_storage_crud.c
+ * @brief Pattern CRUD operations for PRISM K1
+ *
+ * Implements create, read, update, delete, and list operations for pattern files.
+ * Enforces ADR-006 bounds (15-25 patterns, 100KB max size).
+ */
+
+#include "pattern_storage.h"
+#include "pattern_cache.h"
+#include "esp_log.h"
+#include "prism_parser.h"
+
+#ifndef PRISM_STRICT_PRISM_VALIDATION
+#define PRISM_STRICT_PRISM_VALIDATION 1
+#endif
+#include <sys/stat.h>
+#include <dirent.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+
+static const char *TAG = "storage_crud";
+
+// Storage directories
+#define PATTERN_DIR     "/littlefs/patterns"
+#define TEMPLATE_DIR    "/littlefs/templates"
+#define MAX_FILENAME    64
+#define TEMP_SUFFIX     ".tmp"
+
+/**
+ * @brief Helper: Build pattern file path
+ * @param pattern_id Pattern identifier
+ * @param path Output path buffer
+ * @param len Buffer length
+ */
+static void build_pattern_path(const char *pattern_id, char *path, size_t len) {
+    snprintf(path, len, "%s/%s.bin", PATTERN_DIR, pattern_id);
+}
+
+esp_err_t storage_pattern_create(const char *pattern_id, const uint8_t *data, size_t len) {
+    if (!pattern_id || !data || len == 0) {
+        ESP_LOGE(TAG, "Invalid arguments: pattern_id=%p, data=%p, len=%zu",
+                 (void*)pattern_id, (void*)data, len);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Enforce pattern size limit (ADR-006: 100KB)
+    if (len > PATTERN_SIZE_MAX) {
+        ESP_LOGE(TAG, "Pattern too large: %zu bytes (max %d)", len, PATTERN_SIZE_MAX);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Ensure patterns directory exists
+    struct stat st;
+    if (stat(PATTERN_DIR, &st) != 0) {
+        ESP_LOGI(TAG, "Creating patterns directory: %s", PATTERN_DIR);
+        if (mkdir(PATTERN_DIR, 0755) != 0) {
+            ESP_LOGE(TAG, "Failed to create patterns directory");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    // Check storage bounds (ADR-006: 15-25 patterns)
+    size_t count = 0;
+    storage_pattern_count(&count);
+    if (count >= PATTERN_IDEAL_COUNT) {
+        ESP_LOGW(TAG, "Pattern storage full (%zu/%d patterns)", count, PATTERN_IDEAL_COUNT);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Build file path
+    char path[MAX_FILENAME];
+    build_pattern_path(pattern_id, path, sizeof(path));
+
+    // Write pattern to file
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to create pattern file: %s", path);
+        return ESP_ERR_NO_MEM;
+    }
+
+    size_t written = fwrite(data, 1, len, f);
+    fclose(f);
+
+    if (written != len) {
+        ESP_LOGE(TAG, "Failed to write pattern data: wrote %zu/%zu bytes", written, len);
+        remove(path);  // Clean up partial write
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Pattern created: %s (%zu bytes)", pattern_id, len);
+
+    // Warm cache with newly created pattern (best-effort)
+    (void)pattern_cache_put_copy(pattern_id, data, len);
+    return ESP_OK;
+}
+
+esp_err_t storage_pattern_read(const char *pattern_id, uint8_t *buffer, size_t buffer_size, size_t *out_size) {
+    if (!pattern_id || !buffer || !out_size) {
+        ESP_LOGE(TAG, "Invalid arguments: pattern_id=%p, buffer=%p, out_size=%p",
+                 (void*)pattern_id, (void*)buffer, (void*)out_size);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Fast path: try RAM cache
+    const uint8_t* cptr = NULL;
+    size_t csize = 0;
+    if (pattern_cache_try_get(pattern_id, &cptr, &csize)) {
+        if (csize > buffer_size) {
+            ESP_LOGE(TAG, "Buffer too small for cached pattern: need %zu, have %zu", csize, buffer_size);
+            return ESP_ERR_INVALID_SIZE;
+        }
+        memcpy(buffer, cptr, csize);
+        *out_size = csize;
+        ESP_LOGD(TAG, "Cache hit: %s (%zu bytes)", pattern_id, csize);
+        return ESP_OK;
+    }
+
+    char path[MAX_FILENAME];
+    build_pattern_path(pattern_id, path, sizeof(path));
+
+    // Check if file exists and get size
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        ESP_LOGW(TAG, "Pattern not found: %s", pattern_id);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Validate buffer size
+    if ((size_t)st.st_size > buffer_size) {
+        ESP_LOGE(TAG, "Buffer too small: need %ld bytes, have %zu", st.st_size, buffer_size);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Read pattern data
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to open pattern: %s", path);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    size_t bytes_read = fread(buffer, 1, buffer_size, f);
+    fclose(f);
+
+    if (bytes_read != (size_t)st.st_size) {
+        ESP_LOGE(TAG, "Failed to read complete pattern: read %zu/%ld bytes",
+                 bytes_read, st.st_size);
+        return ESP_FAIL;
+    }
+    // If this appears to be a .prism file, verify header CRC
+    if (bytes_read >= sizeof(prism_header_v10_t)) {
+        const uint8_t *data = buffer;
+        const prism_header_v10_t *hdr10 = (const prism_header_v10_t *)data;
+        if (memcmp(hdr10->magic, PRISM_MAGIC, 4) == 0) {
+            prism_header_v11_t parsed;
+            esp_err_t perr = parse_prism_header(data, bytes_read, &parsed);
+            if (perr == ESP_OK) {
+                uint32_t calc = calculate_header_crc(&parsed);
+                if (calc != parsed.base.crc32) {
+                    ESP_LOGE(TAG, "Header CRC mismatch: calc=0x%08lX stored=0x%08lX",
+                             (unsigned long)calc, (unsigned long)parsed.base.crc32);
+                    return ESP_ERR_INVALID_CRC;
+                }
+            } else {
+                #if PRISM_STRICT_PRISM_VALIDATION
+                ESP_LOGE(TAG, ".prism header parse failed (%s)", esp_err_to_name(perr));
+                return perr;
+                #else
+                ESP_LOGW(TAG, ".prism header parse failed (%s), continuing without CRC validation",
+                         esp_err_to_name(perr));
+                #endif
+            }
+        }
+    }
+
+    *out_size = bytes_read;
+    ESP_LOGI(TAG, "Pattern read: %s (%zu bytes)", pattern_id, bytes_read);
+
+    // Insert into cache (best-effort)
+    (void)pattern_cache_put_copy(pattern_id, buffer, bytes_read);
+    return ESP_OK;
+}
+
+esp_err_t storage_pattern_delete(const char *pattern_id) {
+    if (!pattern_id) {
+        ESP_LOGE(TAG, "Invalid argument: pattern_id is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[MAX_FILENAME];
+    build_pattern_path(pattern_id, path, sizeof(path));
+
+    // Check if file exists before attempting delete
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        ESP_LOGW(TAG, "Pattern not found for delete: %s", pattern_id);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Delete the file
+    if (remove(path) != 0) {
+        ESP_LOGE(TAG, "Failed to delete pattern: %s", pattern_id);
+        return ESP_FAIL;
+    }
+
+    // Invalidate RAM cache entry
+    pattern_cache_invalidate(pattern_id);
+
+    ESP_LOGI(TAG, "Pattern deleted: %s", pattern_id);
+    return ESP_OK;
+}
+
+esp_err_t storage_pattern_list(char **pattern_list, size_t max_count, size_t *out_count) {
+    if (!pattern_list || !out_count) {
+        ESP_LOGE(TAG, "Invalid arguments: pattern_list=%p, out_count=%p",
+                 (void*)pattern_list, (void*)out_count);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_count = 0;  // Initialize output
+
+    DIR *dir = opendir(PATTERN_DIR);
+    if (!dir) {
+        ESP_LOGW(TAG, "Patterns directory not found: %s", PATTERN_DIR);
+        return ESP_OK;  // Empty list is valid
+    }
+
+    size_t count = 0;
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL && count < max_count) {
+        // Skip . and ..
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Extract pattern ID (remove .bin extension)
+        char *dot = strrchr(entry->d_name, '.');
+        if (dot && strcmp(dot, ".bin") == 0) {
+            size_t id_len = dot - entry->d_name;
+            if (id_len > 0 && id_len < MAX_FILENAME) {
+                strncpy(pattern_list[count], entry->d_name, id_len);
+                pattern_list[count][id_len] = '\0';
+                count++;
+            }
+        }
+    }
+
+    closedir(dir);
+    *out_count = count;
+
+    ESP_LOGI(TAG, "Pattern list: %zu patterns found", count);
+    return ESP_OK;
+}
+
+esp_err_t storage_pattern_count(size_t *out_count) {
+    if (!out_count) {
+        ESP_LOGE(TAG, "Invalid argument: out_count is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_count = 0;  // Initialize output
+
+    DIR *dir = opendir(PATTERN_DIR);
+    if (!dir) {
+        // Directory doesn't exist yet - return 0 count
+        return ESP_OK;
+    }
+
+    size_t count = 0;
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip . and ..
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        // Count all files (assume they're all patterns)
+        count++;
+    }
+
+    closedir(dir);
+    *out_count = count;
+
+    ESP_LOGD(TAG, "Pattern count: %zu", count);
+    return ESP_OK;
+}
+
+// ============================================================================
+// Template Storage Functions (Atomic Write Flow)
+// ============================================================================
+
+/**
+ * @brief Helper: Build template file path
+ * @param template_id Template identifier
+ * @param path Output path buffer
+ * @param len Buffer length
+ */
+static void build_template_path(const char *template_id, char *path, size_t len) {
+    snprintf(path, len, "%s/%s", TEMPLATE_DIR, template_id);
+}
+
+/**
+ * @brief Helper: Build temporary file path
+ * @param template_id Template identifier
+ * @param path Output path buffer
+ * @param len Buffer length
+ */
+static void build_temp_path(const char *template_id, char *path, size_t len) {
+    snprintf(path, len, "%s/%s%s", TEMPLATE_DIR, template_id, TEMP_SUFFIX);
+}
+
+esp_err_t template_storage_write(const char *template_id, const uint8_t *data, size_t len) {
+    if (!template_id || !data || len == 0) {
+        ESP_LOGE(TAG, "Invalid arguments: template_id=%p, data=%p, len=%zu",
+                 (void*)template_id, (void*)data, len);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Ensure templates directory exists
+    struct stat st;
+    if (stat(TEMPLATE_DIR, &st) != 0) {
+        ESP_LOGI(TAG, "Creating templates directory: %s", TEMPLATE_DIR);
+        if (mkdir(TEMPLATE_DIR, 0755) != 0) {
+            ESP_LOGE(TAG, "Failed to create templates directory");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    // Build paths
+    char temp_path[MAX_FILENAME];
+    char final_path[MAX_FILENAME];
+    build_temp_path(template_id, temp_path, sizeof(temp_path));
+    build_template_path(template_id, final_path, sizeof(final_path));
+
+    // Write to temporary file
+    FILE *f = fopen(temp_path, "wb");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to create temp file: %s", temp_path);
+        return ESP_ERR_NO_MEM;
+    }
+
+    size_t written = fwrite(data, 1, len, f);
+
+    // Ensure data is flushed to disk
+    if (fflush(f) != 0) {
+        ESP_LOGE(TAG, "Failed to flush temp file: %s", temp_path);
+        fclose(f);
+        remove(temp_path);  // Clean up temp file
+        return ESP_FAIL;
+    }
+
+    // Sync to ensure durability (fsync via fileno)
+    int fd = fileno(f);
+    if (fd >= 0) {
+        fsync(fd);
+    }
+
+    fclose(f);
+
+    // Check write was complete
+    if (written != len) {
+        ESP_LOGE(TAG, "Failed to write template data: wrote %zu/%zu bytes", written, len);
+        remove(temp_path);  // Clean up incomplete temp file
+        return ESP_FAIL;
+    }
+
+    // Atomically replace target file
+    if (rename(temp_path, final_path) != 0) {
+        ESP_LOGE(TAG, "Failed to rename temp file to final: %s -> %s", temp_path, final_path);
+        remove(temp_path);  // Clean up temp file
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Template written atomically: %s (%zu bytes)", template_id, len);
+    return ESP_OK;
+}
+
+esp_err_t template_storage_read(const char *template_id, uint8_t *buffer, size_t buffer_size, size_t *out_size) {
+    if (!template_id || !buffer || !out_size) {
+        ESP_LOGE(TAG, "Invalid arguments: template_id=%p, buffer=%p, out_size=%p",
+                 (void*)template_id, (void*)buffer, (void*)out_size);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[MAX_FILENAME];
+    build_template_path(template_id, path, sizeof(path));
+
+    // Check if file exists and get size
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        ESP_LOGW(TAG, "Template not found: %s", template_id);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Validate buffer size
+    if ((size_t)st.st_size > buffer_size) {
+        ESP_LOGE(TAG, "Buffer too small for template: need %ld bytes, have %zu",
+                 st.st_size, buffer_size);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Read template data
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to open template: %s", path);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    size_t bytes_read = fread(buffer, 1, buffer_size, f);
+    fclose(f);
+
+    if (bytes_read != (size_t)st.st_size) {
+        ESP_LOGE(TAG, "Failed to read complete template: read %zu/%ld bytes",
+                 bytes_read, st.st_size);
+        return ESP_FAIL;
+    }
+
+    *out_size = bytes_read;
+    ESP_LOGI(TAG, "Template read: %s (%zu bytes)", template_id, bytes_read);
+    return ESP_OK;
+}
+
+esp_err_t template_storage_list(char **template_list, size_t max_count, size_t *out_count) {
+    if (!template_list || !out_count) {
+        ESP_LOGE(TAG, "Invalid arguments: template_list=%p, out_count=%p",
+                 (void*)template_list, (void*)out_count);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_count = 0;  // Initialize output
+
+    DIR *dir = opendir(TEMPLATE_DIR);
+    if (!dir) {
+        ESP_LOGW(TAG, "Templates directory not found: %s", TEMPLATE_DIR);
+        return ESP_OK;  // Empty list is valid
+    }
+
+    size_t count = 0;
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL && count < max_count) {
+        // Skip . and ..
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Skip temporary files
+        const char *temp_ext = strstr(entry->d_name, TEMP_SUFFIX);
+        if (temp_ext && strcmp(temp_ext, TEMP_SUFFIX) == 0) {
+            ESP_LOGD(TAG, "Skipping temp file: %s", entry->d_name);
+            continue;
+        }
+
+        // Add template to list
+        size_t name_len = strlen(entry->d_name);
+        if (name_len > 0 && name_len < MAX_FILENAME) {
+            memcpy(template_list[count], entry->d_name, name_len);
+            template_list[count][name_len] = '\0';
+            count++;
+        }
+    }
+
+    closedir(dir);
+    *out_count = count;
+
+    ESP_LOGI(TAG, "Template list: %zu templates found", count);
+    return ESP_OK;
+}
+
+esp_err_t template_storage_delete(const char *template_id) {
+    if (!template_id) {
+        ESP_LOGE(TAG, "Invalid argument: template_id is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[MAX_FILENAME];
+    build_template_path(template_id, path, sizeof(path));
+
+    // Check if file exists
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        ESP_LOGW(TAG, "Template not found for delete: %s", template_id);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Delete the file
+    if (remove(path) != 0) {
+        ESP_LOGE(TAG, "Failed to delete template: %s", template_id);
+        return ESP_FAIL;
+    }
+
+    // Also try to clean up any leftover temp files
+    char temp_path[MAX_FILENAME];
+    build_temp_path(template_id, temp_path, sizeof(temp_path));
+    remove(temp_path);  // Ignore errors - temp file may not exist
+
+    ESP_LOGI(TAG, "Template deleted: %s", template_id);
+    return ESP_OK;
+}

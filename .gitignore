@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Node / Frontend
+studio/node_modules/
+studio/dist/
+studio/test-results/
+studio/playwright-report/
+
+# Tauri / Rust
+studio/src-tauri/target/
+
+# Firmware build outputs
+firmware/build/
+firmware/**/build/
+
+# Generated output bundles
+out/
+
+# Logs
+*.log
+
+# Virtual envs
+.venv/
+venv/

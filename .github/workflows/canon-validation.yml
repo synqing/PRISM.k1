@@ -1,0 +1,127 @@
+name: CANON Compliance Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate-canon:
+    name: Validate CANON Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup environment
+        run: |
+          chmod +x .taskmaster/scripts/*.sh
+
+      - name: Check CANON freshness
+        run: |
+          echo "Verifying CANON.md matches ADRs..."
+          ./.taskmaster/scripts/generate-canon.sh
+
+          # Check if CANON changed after regeneration
+          if git diff --quiet .taskmaster/CANON.md; then
+            echo "✓ CANON.md is up to date"
+          else
+            echo "✗ CANON.md is outdated!"
+            echo "CANON.md must be regenerated from ADRs"
+            exit 1
+          fi
+
+      - name: Detect manual CANON edits
+        run: |
+          # Check git history for direct CANON.md edits without [AUTO] marker
+          if git log --oneline -1 -- .taskmaster/CANON.md | grep -v "\[AUTO\]" | grep -q "CANON.md"; then
+            echo "ERROR: CANON.md was manually edited!"
+            echo "CANON.md must only be generated via scripts/generate-canon.sh"
+            exit 1
+          fi
+          echo "✓ No manual CANON edits detected"
+
+      - name: Validate code constants
+        run: |
+          echo "Checking code matches CANON specifications..."
+          ./.taskmaster/scripts/validate-canon.sh
+
+      - name: Verify ADR format
+        run: |
+          echo "Validating ADR structure..."
+          for adr in .taskmaster/decisions/[0-9]*.md; do
+            if [ -f "$adr" ]; then
+              # Check for required sections
+              if ! grep -q "^## Context" "$adr"; then
+                echo "✗ $adr missing Context section"
+                exit 1
+              fi
+              if ! grep -q "^## Decision" "$adr"; then
+                echo "✗ $adr missing Decision section"
+                exit 1
+              fi
+              if ! grep -q "^## Alternatives Considered" "$adr"; then
+                echo "✗ $adr missing Alternatives Considered section"
+                exit 1
+              fi
+              echo "✓ $(basename $adr) format valid"
+            fi
+          done
+
+      - name: Summary
+        if: success()
+        run: |
+          echo ""
+          echo "========================================="
+          echo "✓ ALL CANON COMPLIANCE CHECKS PASSED"
+          echo "========================================="
+          echo ""
+          echo "  • CANON.md is current"
+          echo "  • No manual CANON edits"
+          echo "  • Code matches specifications"
+          echo "  • ADR format valid"
+          echo ""
+
+  build-firmware:
+    name: Build Firmware
+    needs: parser-testbed
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: ESP-IDF Build
+        run: |
+          echo "Firmware build would run here"
+          echo "Only proceeds if CANON validation passed"
+          # Actual ESP-IDF build commands would go here
+
+  parser-testbed:
+    name: Parser Harness Regression
+    needs: validate-canon
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run parser harness targets
+        run: |
+          VECTOR_DIR=$(mktemp -d)
+          REPORT_PATH="$VECTOR_DIR/report.json"
+          echo "Using VECTOR_DIR=$VECTOR_DIR"
+          make vectors VECTOR_DIR=$VECTOR_DIR
+          make regress VECTOR_DIR=$VECTOR_DIR REPORT=$REPORT_PATH
+          echo "Regression report:"
+          cat "$REPORT_PATH"

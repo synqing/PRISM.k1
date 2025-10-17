@@ -1,0 +1,36 @@
+#!/bin/bash
+# .githooks/pre-push
+#
+# CANON Validation Hook
+# Ensures code matches CANON before pushing
+
+set -e
+
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${BLUE}Validating CANON compliance before push...${NC}"
+
+# Run CANON validation
+if ./.taskmaster/scripts/validate-canon.sh; then
+    echo -e "${GREEN}✓ CANON validation passed${NC}"
+    echo "Safe to push"
+    exit 0
+else
+    echo -e "${RED}✗ CANON validation failed${NC}"
+    echo ""
+    echo "Code does not match CANON specifications."
+    echo "Push BLOCKED to prevent specification drift."
+    echo ""
+    echo "To fix:"
+    echo "  1. Run: ./scripts/validate-canon.sh (see specific failures)"
+    echo "  2. Update code to match CANON"
+    echo "  3. OR create new ADR if CANON needs changing"
+    echo ""
+    echo "To bypass (NOT recommended):"
+    echo "  git push --no-verify"
+    echo ""
+    exit 1
+fi
