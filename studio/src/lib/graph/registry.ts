@@ -1,4 +1,5 @@
 import type { Sampler, CompileContext } from './types';
+import { buildOklchLut } from '../color/oklchLut';
 
 export type NodeCompiler = (inputs: Record<string, Sampler>, params: Record<string, any>, ctx: CompileContext) => Sampler;
 
@@ -73,6 +74,19 @@ export const Registry: Record<string, NodeCompiler> = {
       return [Math.round((A[0]+B[0])/2), Math.round((A[1]+B[1])/2), Math.round((A[2]+B[2])/2)];
     };
   },
+  Impulse: (_inputs, params) => {
+    const rate = Math.max(0, Number(params.rate ?? 1.0)); // impulses per second
+    let lastK = -1;
+    return (i, t) => {
+      const k = Math.floor(t * rate);
+      const isHit = k !== lastK;
+      if (i === 160 && isHit) {
+        lastK = k;
+        return [255,255,255];
+      }
+      return [0,0,0];
+    };
+  },
   Noise2D: (_inputs, params) => {
     // Deterministic 2D value noise using integer hash; seedable
     const seed = Number(params.seed ?? 1337) | 0;
@@ -105,24 +119,18 @@ export const Registry: Record<string, NodeCompiler> = {
     const c0 = (params.c0 as string) ?? '#000000';
     const c1 = (params.c1 as string) ?? '#ffffff';
     const speed = Number(params.speed ?? 0); // cycles per second across strip
-    const h2r = (h: string) => {
-      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
-      return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [255,255,255];
-    };
-    const a = h2r(c0); const b = h2r(c1);
+    // Precompute 256*RGB8 OKLCH gradient LUT for perceptual smoothness
+    const lut = buildOklchLut([c0, c1], { gamma: 2.2, gamut: 'clip' });
     return (i, tSec) => {
-      // shift gradient position over time by speed
       let t = iNorm(i);
       if (speed !== 0) {
         const shift = (speed * tSec) % 1;
-        t = (t + shift);
-        t = t - Math.floor(t); // wrap [0,1)
+        t = t + shift;
+        if (t > 1) t = t - Math.floor(t);
       }
-      return [
-        Math.round(a[0]*(1-t)+b[0]*t),
-        Math.round(a[1]*(1-t)+b[1]*t),
-        Math.round(a[2]*(1-t)+b[2]*t),
-      ];
+      const idx = Math.max(0, Math.min(255, Math.round(t * 255)));
+      const o = idx * 3;
+      return [lut[o], lut[o + 1], lut[o + 2]];
     };
   },
   Brightness: (inputs, params) => {

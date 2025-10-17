@@ -1,4 +1,3 @@
-import React from 'react';
 import { useGraphStore, withHistoryBatch } from '../../stores/graph';
 import { NodeDefinitions } from '../../lib/graph/nodeDefinitions';
 
@@ -11,7 +10,8 @@ export default function GraphCanvas() {
   const handleAdd = (kind: keyof typeof NodeDefinitions) => {
     const id = `${kind}-${Math.floor(Math.random()*1e6)}`;
     withHistoryBatch(() => {
-      addNode({ id, kind, params: {}, inputs: {} }, { x: 40 + Object.keys(graph.nodes).length * 120, y: 40 });
+      // Cast to any here because UI store's NodeKind is narrower than the runtime set
+      addNode({ id, kind: kind as any, params: {}, inputs: {} }, { x: 40 + Object.keys(graph.nodes).length * 120, y: 40 });
     });
   };
 
@@ -38,4 +38,3 @@ export default function GraphCanvas() {
     </div>
   );
 }
-

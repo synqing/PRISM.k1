@@ -1,5 +1,14 @@
 export function mapUploadError(raw: string): string {
   const s = String(raw || '').toUpperCase();
+  if (s.startsWith('DEVICE_ERROR')) {
+    const code = raw.split(':').slice(1).join(':').trim().toUpperCase();
+    if (code.includes('BUSY')) return 'Device is busy. Try again after current operation completes.';
+    if (code.includes('SIZE') || code.includes('256')) return 'Pattern exceeds device size limit (256KB). Reduce duration or complexity.';
+    if (code.includes('CRC')) return 'Device reported a CRC mismatch. Check network stability and retry.';
+    if (code.includes('OFFSET')) return 'Upload offset overflow. Restart the upload.';
+    if (code.includes('SESSION')) return 'No active upload session. Restart the upload from the beginning.';
+    return `Device error: ${raw}`;
+  }
   if (s.includes('WS_CONNECT_FAILED')) return 'Unable to connect to device. Check network and host name.';
   if (s.includes('WS_SEND_FAILED')) return 'Network error while uploading. Please retry. If it persists, check Wi‑Fi signal.';
   if (s.includes('WS_CLOSED')) return 'Connection closed unexpectedly. Retrying may help.';

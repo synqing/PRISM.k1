@@ -1,4 +1,4 @@
-import type { NodeKind } from '../../stores/graph';
+import type { NodeKind } from './types';
 
 export type PinDef = { required?: boolean; arity?: 1 | 'many' };
 export type ParamDef = { type: 'number' | 'string' | 'color'; min?: number; max?: number; enum?: string[] };
@@ -12,6 +12,7 @@ export const NodeDefinitions: Record<NodeKind, { inputs: Record<string, PinDef>;
   Ring: { inputs: { src: { required: false } }, params: { radius: { type: 'number', min: 0, max: 1 }, width: { type: 'number', min: 0.001, max: 0.5 } } },
   Fade: { inputs: { src: { required: true } }, params: { amount: { type: 'number', min: 0, max: 1 } } },
   CenterOutMirror: { inputs: { src: { required: true } }, params: {} },
+  Impulse: { inputs: {}, params: { rate: { type: 'number', min: 0, max: 10 } } },
   Solid: { inputs: {}, params: { color: { type: 'color' } } },
   Gradient: { inputs: {}, params: { c0: { type: 'color' }, c1: { type: 'color' }, speed: { type: 'number', min: -5, max: 5 } } },
   Brightness: { inputs: { src: { required: true } }, params: { amount: { type: 'number', min: 0, max: 255 } } },
@@ -20,8 +21,5 @@ export const NodeDefinitions: Record<NodeKind, { inputs: Record<string, PinDef>;
   Multiply: { inputs: { a: { required: true }, b: { required: true } }, params: {} },
   PaletteMap: { inputs: { src: { required: true } }, params: {} },
   Noise2D: { inputs: {}, params: { seed: { type: 'number' }, scale: { type: 'number', min: 1, max: 64 }, amplitude: { type: 'number', min: 0, max: 255 } } },
-  Rotate: { inputs: { src: { required: true } }, params: { deg: { type: 'number', min: -180, max: 180 } } },
-  Scale: { inputs: { src: { required: true } }, params: { factor: { type: 'number', min: 0.1, max: 10 } } },
-  Mirror: { inputs: { src: { required: true } }, params: {} },
   ToK1: { inputs: { src: { required: true } }, params: {} },
 };

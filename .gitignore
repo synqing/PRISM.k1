@@ -28,6 +28,9 @@ node_modules/
 .beads/*.db-*
 .tools/
 
+# Local care packages and editor caches
+.cursor/
+
 # Task files
 # tasks.json
 # tasks/ 

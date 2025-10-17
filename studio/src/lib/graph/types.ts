@@ -14,6 +14,8 @@ export type NodeKind =
   | 'Ring'
   | 'Fade'
   | 'CenterOutMirror'
+  | 'Impulse'
+  | 'Noise2D'
   | 'ToK1';
 
 export type ParamValue = number | string;

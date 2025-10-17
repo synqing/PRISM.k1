@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Registry } from './registry';
 
-const dummy = () => [0,0,0] as [number,number,number];
-
 describe('graph registry samplers', () => {
   it('Solid returns constant color', () => {
     const s = Registry.Solid({}, { color: '#123456' }, {});

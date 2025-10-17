@@ -45,6 +45,43 @@ idf.py build
 ```bash
 # Find your device port (usually /dev/cu.usbserial-* on macOS)
 idf.py -p /dev/cu.usbserial-0001 flash monitor
+
+### 4. Optional: 4 MB Flash (Single Factory) for Bring-up
+
+For boards with 4 MB flash, use the provided single-factory partition table (no OTA) to maximize app space during bring-up:
+
+```bash
+idf.py set-target esp32s3
+idf.py -T partitions-4mb.csv build
+idf.py -p /dev/cu.usbserial-0001 flash monitor
+```
+
+You can also set this in menuconfig: Partition Table → Custom, and point to `partitions-4mb.csv`.
+
+### UART Test Mode (No Wi‑Fi Required)
+
+A UART test mode mirrors upload/control flows without sockets. It feeds the same protocol parser used by WS/TLV.
+
+- Enable: `idf.py menuconfig → PRISM Network/Test → Enable UART test mode` (CONFIG_PRISM_UART_TEST)
+- UART: 115200‑8N1 on UART0 (USB serial)
+- Commands (one per line):
+  - `STATUS`
+  - `PLAY <name>` / `STOP`
+  - `B <target_u8> <ms_u16>` (brightness ramp)
+  - `G <gamma_x100_u16> <ms_u16>` (gamma ramp)
+  - `BEGIN <name> <size_u32> <crc32_hex>`
+  - `DATA <offset_u32> <base64>`
+  - `END`
+
+Host CLI (requires `pyserial`):
+
+```bash
+python3 tools/serial/prism_serial_cli.py --port /dev/tty.usbserial-0001 status
+python3 tools/serial/prism_serial_cli.py --port /dev/tty.usbserial-0001 upload /path/to/baked.prism
+python3 tools/serial/prism_serial_cli.py --port /dev/tty.usbserial-0001 play baked
+```
+
+Uploads enforce the 256 KB pattern size and CRC32 parity (empty PUT_END semantics per SoT).
 ```
 
 ## Project Structure

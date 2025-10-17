@@ -64,4 +64,41 @@ describe('motion examples', () => {
     const edgeBright = frame[0];
     expect(centerBright).toBeGreaterThanOrEqual(edgeBright);
   });
+
+  it('Interference: Sum of two SinOsc fields then PaletteMap', () => {
+    const g: Graph = {
+      nodes: {
+        sinA: { id: 'sinA', kind: 'SinOsc', params: { freq: 0.2, spatial: 1.0, phase: 0.0 }, inputs: {} },
+        sinB: { id: 'sinB', kind: 'SinOsc', params: { freq: 0.33, spatial: 2.0, phase: 0.1 }, inputs: {} },
+        add: { id: 'add', kind: 'Add', params: {}, inputs: { a: 'sinA', b: 'sinB' } },
+        pal: { id: 'pal', kind: 'PaletteMap', params: {}, inputs: { src: 'add' } },
+        out: { id: 'out', kind: 'ToK1', params: {}, inputs: { src: 'pal' } },
+      },
+      order: ['sinA','sinB','add','pal','out'],
+      ledCount: 320,
+    };
+    const f0 = evaluateFrame(g, 0.0, { lut: makeLut() });
+    const f1 = evaluateFrame(g, 0.5, { lut: makeLut() });
+    expect(f0.length).toBe(320*3);
+    expect(Array.from(f0)).not.toEqual(Array.from(f1));
+  });
+
+  it('Confetti: Impulse at center, mirrored and faded', () => {
+    const g: Graph = {
+      nodes: {
+        imp: { id: 'imp', kind: 'Impulse', params: { rate: 5 }, inputs: {} },
+        mir: { id: 'mir', kind: 'CenterOutMirror', params: {}, inputs: { src: 'imp' } },
+        fade: { id: 'fade', kind: 'Fade', params: { amount: 0.8 }, inputs: { src: 'mir' } },
+        pal: { id: 'pal', kind: 'PaletteMap', params: {}, inputs: { src: 'fade' } },
+        out: { id: 'out', kind: 'ToK1', params: {}, inputs: { src: 'pal' } },
+      },
+      order: ['imp','mir','fade','pal','out'],
+      ledCount: 320,
+    };
+    const f0 = evaluateFrame(g, 0.0, { lut: makeLut() });
+    const center0 = f0[160*3];
+    const f1 = evaluateFrame(g, 0.25, { lut: makeLut() });
+    const center1 = f1[160*3];
+    expect(center0).not.toBe(center1);
+  });
 });

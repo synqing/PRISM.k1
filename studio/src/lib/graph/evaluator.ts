@@ -1,9 +1,14 @@
 import type { Graph } from './types';
 import { evaluateFrame } from './runtime';
-import type { Graph } from './types';
 
 // Streaming evaluation API: invokes callback per frame
-export async function evaluateGraph(graph: Graph, seconds: number, fps: number, cb: (frame: Uint8Array, index: number) => void, ctx?: { lut?: Uint8Array }) {
+export async function evaluateGraph(
+  graph: Graph,
+  seconds: number,
+  fps: number,
+  cb: (frame: Uint8Array, index: number) => void,
+  ctx?: { lut?: Uint8Array }
+) {
   const total = Math.max(1, Math.round(seconds * fps));
   for (let i=0;i<total;i++){
     const t = i / fps;

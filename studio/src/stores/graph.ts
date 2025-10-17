@@ -36,7 +36,7 @@ function dependsOn(nodes: Record<string, GraphNode>, start: string, target: stri
 export const useGraphStore = create<GraphState>()(
   devtools(
     temporal(
-      immer((set, get) => ({
+      immer((set, _get) => ({
         graph: { nodes: {}, order: [], revision: 0 },
         layout: {},
         selection: [],
@@ -95,4 +95,3 @@ export const { undo: graphUndo, redo: graphRedo, clear: graphHistoryClear, pause
 export function withHistoryBatch(fn: () => void) {
   graphHistoryPause(); try { fn(); } finally { graphHistoryResume(); }
 }
-

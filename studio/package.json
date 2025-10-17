@@ -18,6 +18,9 @@
     "test:e2e": "playwright test",
     "test:e2e:ci": "cross-env CI=1 playwright test --reporter=list",
     "test:rust": "cargo nextest run --manifest-path src-tauri/Cargo.toml",
+    "test:rust:fast": "ACK_TIMEOUT_MS=250 RETRY_BASE_MS=50 FINAL_ACK_TIMEOUT_MS=250 cargo nextest run --manifest-path src-tauri/Cargo.toml",
+    "ci:fast": "pnpm run type-check && pnpm run lint && pnpm run test && ACK_TIMEOUT_MS=250 RETRY_BASE_MS=50 FINAL_ACK_TIMEOUT_MS=250 pnpm run test:rust",
+    "tauri:dev:fast": "ACK_TIMEOUT_MS=250 RETRY_BASE_MS=50 FINAL_ACK_TIMEOUT_MS=250 tauri dev",
     "prepare": "cd .. && husky install studio/.husky"
   },
   "dependencies": {
@@ -45,6 +48,7 @@
     "@types/lodash-es": "^4.17.12",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/node": "^20.11.30",
     "@typescript-eslint/eslint-plugin": "^8.11.0",
     "@typescript-eslint/parser": "^8.11.0",
     "@vitejs/plugin-react": "^4.3.4",
@@ -61,6 +65,7 @@
     "prettier": "^3.3.3",
     "typescript": "~5.9.3",
     "vite": "^7.1.7",
+    "execa": "^8.0.1",
     "vitest": "^2.1.4"
   },
   "lint-staged": {

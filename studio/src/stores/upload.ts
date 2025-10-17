@@ -22,12 +22,15 @@ export const useUploadStore = create<UploadState>((set, get) => ({
   phase: 'idle', percent: 0, bytesSent: 0, totalBytes: 0, bytesPerSec: 0,
   error: null, startedAt: null, finishedAt: null,
   cancel: async () => {
-    try { const { invoke } = await import('@tauri-apps/api/core'); await invoke('device_upload_cancel'); } catch {}
+    try { const { invoke } = await import('@tauri-apps/api/core'); await invoke('device_upload_cancel'); } catch { /* ignore */ void 0; }
     set({ phase: 'cancelled', finishedAt: Date.now() });
   },
   reset: () => set({ phase: 'idle', percent: 0, bytesSent: 0, totalBytes: 0, bytesPerSec: 0, error: null, startedAt: null, finishedAt: null }),
   subscribe: () => {
     // idempotent attach (simple)
+    const w: any = (typeof window !== 'undefined' ? window : {}) as any;
+    const internals = w.__TAURI_INTERNALS__;
+    if (!internals || typeof internals.transformCallback !== 'function') return; // avoid attaching in non-tauri or partial env
     listen('upload:progress', (e) => {
       const p = e.payload as any;
       const nextPhase = (p.phase as UploadPhase) ?? 'stream';

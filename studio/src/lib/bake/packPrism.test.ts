@@ -31,7 +31,7 @@ describe('packPrism ADR-009 header parity', () => {
       for (let i=0;i<64;i++){ expect(pyBuf[i]).toBe(bytes[i]); }
       // Compare payload exact
       for (let i=64;i<bytes.length;i++){ expect(pyBuf[i]).toBe(bytes[i]); }
-    } catch (e) {
+    } catch {
       // Python not available; skip fixture compare but assert header invariants
       expect(bytes[8]).toBe(0x01); // effect solid
     }
@@ -53,7 +53,7 @@ describe('packPrism ADR-009 header parity', () => {
       const pyBuf = Buffer.from(proc.stdout as any, 'binary');
       expect(pyBuf.length).toBe(bytes.length);
       for (let i=0;i<64+palette.length*4;i++){ expect(pyBuf[i]).toBe(bytes[i]); }
-    } catch (e) {
+    } catch {
       expect(bytes[49]).toBe(palette.length);
     }
   });
@@ -75,7 +75,7 @@ describe('packPrism ADR-009 header parity', () => {
       // Spot check first few RLE pairs
       expect(result.bytes[64]).toBe(pyBuf[64]);
       expect(result.bytes[65]).toBe(pyBuf[65]);
-    } catch (e) {
+    } catch {
       // Skip if python unavailable
       expect(result.bytes[0]).toBe('P'.charCodeAt(0));
     }
@@ -92,7 +92,7 @@ describe('packPrism ADR-009 header parity', () => {
       const pyBuf = Buffer.from(proc.stdout as any, 'binary');
       expect(pyBuf.length).toBe(result.bytes.length);
       for (let i=0;i<64;i++){ expect(pyBuf[i]).toBe(result.bytes[i]); }
-    } catch (e) {
+    } catch {
       expect(result.bytes[0]).toBe('P'.charCodeAt(0));
     }
   });
@@ -109,7 +109,7 @@ describe('packPrism ADR-009 header parity', () => {
         const proc = await execa('python', ['tools/tests/gen_fixture_prism.py', '--fps', String(fps), '--led', String(led), '--frames', String(frames), '--name', 'beta', '--color', '#000000', '--palette', p.join(',')], { cwd: process.cwd(), stdout: 'pipe' as any });
         const pyBuf = Buffer.from(proc.stdout as any, 'binary');
         for (let i=0;i<64 + p.length*4;i++){ expect(pyBuf[i]).toBe(result.bytes[i]); }
-      } catch (e) {
+      } catch {
         // Skip strict compare if python missing
       }
     }

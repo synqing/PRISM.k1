@@ -3,9 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import * as fs from '@tauri-apps/plugin-fs';
 import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
 import { log } from '../../lib/logger';
+import { compileGraphToIR } from '../../lib/ir/exportIR';
+import { appendTelemetry } from '../../lib/telemetry';
 import ProgressPanel from './ProgressPanel';
 import { useUploadStore } from '../../stores/upload';
 import { mapUploadError } from '../../lib/uploadErrors';
+import { CAP_PALETTE, CAP_COMPRESS, CAP_RESUME, CAP_EVENTS, CAP_PROGRAM } from '../../lib/protocol';
 import { PRESETS } from '../../lib/presets';
 import { useProjectStore } from '../../stores/project';
 
@@ -23,6 +26,7 @@ type StatusInfo = {
   storageAvailable: number;
   maxChunk: number;
   templateCount: number;
+  caps?: number;
 } | null;
 
 type PatternItem = { id: string; size: number; mtime: number };
@@ -72,6 +76,8 @@ export default function DevicePanel() {
         geometryId,
         palettePolicy: devicePaletteBlend ? 'device_blend' : 'host_lut',
       });
+      // Append telemetry snapshot with publish metadata
+      void appendTelemetry({ ts: Date.now(), phase: 'publish', bytesPerSec: upload.bytesPerSec, totalBytes: totalSize, percent: 100, ttflMs, });
     }
   }, [upload.phase]);
 
@@ -325,15 +331,27 @@ export default function DevicePanel() {
   const [useHueShift, setUseHueShift] = React.useState<boolean>(false);
   const [hueDeg, setHueDeg] = React.useState<number>(0);
   const [hueRate, setHueRate] = React.useState<number>(30);
+  const [publishMode, setPublishMode] = React.useState<'clip'|'program'>(() => {
+    try { return (localStorage.getItem('prism.publish.mode') as any) || 'clip'; } catch { return 'clip'; }
+  });
+  const [capByBrightness, setCapByBrightness] = React.useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('prism.bake.capByBrightness') || 'false'); } catch { return false; }
+  });
   // Playback controls
   const [brightness, setBrightness] = React.useState<number>(255);
   const [gammaX100, setGammaX100] = React.useState<number>(220);
   const rampTimer = React.useRef<any>(null);
   const sendBrightness = React.useCallback(async (val: number) => {
-    if (!active) return; try { await invoke('device_control_brightness', { host: active.host, target: Math.max(0, Math.min(255, Math.round(val))), durationMs: 150 }); } catch {}
+    if (!active) return;
+    try {
+      await invoke('device_control_brightness', { host: active.host, target: Math.max(0, Math.min(255, Math.round(val))), durationMs: 150 });
+    } catch (e) { log('error', `brightness failed: ${String(e)}`); }
   }, [active]);
   const sendGamma = React.useCallback(async (val: number) => {
-    if (!active) return; try { await invoke('device_control_gamma', { host: active.host, gammaX100: Math.max(50, Math.min(500, Math.round(val))), durationMs: 150 }); } catch {}
+    if (!active) return;
+    try {
+      await invoke('device_control_gamma', { host: active.host, gammaX100: Math.max(50, Math.min(500, Math.round(val))), durationMs: 150 });
+    } catch (e) { log('error', `gamma failed: ${String(e)}`); }
   }, [active]);
   const throttledSend = (kind: 'b'|'g', val: number) => {
     if (rampTimer.current) clearTimeout(rampTimer.current);
@@ -377,6 +395,19 @@ export default function DevicePanel() {
     return `${dir ? dir + '/' : ''}${base}-${Date.now()}${ext}`;
   };
 
+  function renderCapBadge(label: string, on: boolean, color: string) {
+    return (
+      <span title={on ? `${label} supported` : `${label} not supported`} style={{
+        fontSize: 11,
+        padding: '2px 6px',
+        borderRadius: 12,
+        border: `1px solid ${on ? color : '#444'}`,
+        color: on ? color : '#777',
+        background: on ? 'transparent' : 'transparent',
+      }}>{label}</span>
+    );
+  }
+
   return (
     <section style={{ padding: 16, border: '1px solid #333', borderRadius: 8, marginTop: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -388,6 +419,16 @@ export default function DevicePanel() {
           {latencyMs != null && <span> ({Math.round(latencyMs)} ms)</span>}
         </span>
       </div>
+      {/* Capability badges when STATUS.caps present */}
+      {statusInfo && typeof statusInfo.caps === 'number' && (
+        <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {renderCapBadge('Palette', (statusInfo.caps & CAP_PALETTE) !== 0, '#8e44ad')}
+          {renderCapBadge('Resume', (statusInfo.caps & CAP_RESUME) !== 0, '#16a085')}
+          {renderCapBadge('Events', (statusInfo.caps & CAP_EVENTS) !== 0, '#2980b9')}
+          {renderCapBadge('Compress', (statusInfo.caps & CAP_COMPRESS) !== 0, '#7f8c8d')}
+          {renderCapBadge('Program', (statusInfo.caps & CAP_PROGRAM) !== 0, '#27ae60')}
+        </div>
+      )}
       {devices.length === 0 ? (
         <p style={{ opacity: 0.75, marginTop: 12 }}>No devices found yet.</p>
       ) : (
@@ -428,6 +469,12 @@ export default function DevicePanel() {
               <div>Storage Free: <strong>{fmtBytes(statusInfo.storageAvailable)}</strong></div>
               <div>Max Chunk: <strong>{statusInfo.maxChunk}</strong></div>
               <div>Templates: <strong>{statusInfo.templateCount}</strong></div>
+              {typeof (statusInfo as any).caps === 'number' && (
+                <div title="Device capabilities" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  Caps:
+                  <span style={{ marginLeft: 6, padding: '2px 6px', border: '1px solid #333', borderRadius: 4, opacity: ((statusInfo as any).caps & CAP_PALETTE) ? 1 : 0.4 }}>Palette</span>
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ opacity: 0.7 }}>No status yet.</div>
@@ -448,7 +495,7 @@ export default function DevicePanel() {
                       try {
                         const v = { seconds: p.seconds, fps: p.fps, color: p.color, paletteStr: p.palette.join(','), useGradient: !!p.useGradient, grad: p.grad || null, useHueShift: !!p.useHueShift, hue: p.hue || null };
                         localStorage.setItem(`prism.preset.${active.host}`, JSON.stringify(v));
-                      } catch {}
+                      } catch { /* ignore */ void 0; }
                     }
                   }}>{p.name}</button>
                 ))}
@@ -456,6 +503,15 @@ export default function DevicePanel() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <button onClick={() => active ? listPatterns(active) : undefined}>Refresh</button>
                 <button onClick={() => active ? deleteAll(active) : undefined} disabled={!active || connectState[active.host] !== 'CONNECTED'}>Delete All</button>
+                {/* Publish mode */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ fontSize: 12, opacity: 0.9 }}>Publish
+                    <select value={publishMode} onChange={e => { const v = (e.target as HTMLSelectElement).value as any; setPublishMode(v); try { localStorage.setItem('prism.publish.mode', v); } catch { /* ignore */ void 0; } }} style={{ marginLeft: 4 }}>
+                      <option value="clip">Clip (.prism)</option>
+                      <option value="program" disabled={!statusInfo || typeof statusInfo.caps !== 'number' || (statusInfo.caps & CAP_PROGRAM) === 0}>Program (IR v0.1)</option>
+                    </select>
+                  </label>
+                </div>
                 {/* Bake & Upload with controls */}
                 <button disabled={!active || upload.phase === 'stream' || upload.phase === 'finalizing' || upload.phase === 'cancelled'} onClick={async () => {
                   if (!active) { addToast('No device', 'error'); return; }
@@ -485,15 +541,44 @@ export default function DevicePanel() {
                     nodes['out'] = { id: 'out', kind: 'ToK1', params: {}, inputs: { src: lastId } };
                     const order = Object.keys(nodes);
                     const graph = { nodes, order, ledCount: 320 };
-                    const { bytes } = await bakeProjectToPrism(graph as any, seconds, fps, 320, palette);
+                    // Compute embedPaletteHeader policy
+                    const caps = statusInfo?.caps ?? 0;
+                    const embedPaletteHeader = !(devicePaletteBlend && (caps & CAP_PALETTE));
+                    // Clip or Program selection (program currently behind firmware; fallback to clip)
+                    let bytes: Uint8Array;
+                    if (publishMode === 'program') {
+                      try {
+                        await compileGraphToIR(
+                          undefined,
+                          embedPaletteHeader
+                            ? undefined
+                            : (usePalette
+                                ? (await import('../../lib/color/oklchLut')).paletteHexToRgbBytes(palette)
+                                : undefined)
+                        );
+                        // Fallback: until firmware supports programs, upload as clip instead
+                        const res = await bakeProjectToPrism(graph as any, seconds, fps, 320, palette, embedPaletteHeader, capByBrightness ? brightness : undefined);
+                        bytes = res.bytes;
+                        addToast('Program mode requires firmware support; publishing clip fallback', 'info');
+                      } catch {
+                        const res = await bakeProjectToPrism(graph as any, seconds, fps, 320, palette, embedPaletteHeader);
+                        bytes = res.bytes;
+                      }
+                    } else {
+                      const res = await bakeProjectToPrism(graph as any, seconds, fps, 320, palette, embedPaletteHeader, capByBrightness ? brightness : undefined);
+                      bytes = res.bytes;
+                    }
                     await invoke('device_upload', { host: active.host, name: 'baked', bytes: Array.from(bytes) });
                     // Auto-PLAY the uploaded pattern id
-                    try { await invoke('device_control_play', { host: active.host, name: 'baked' }); } catch {}
+                    try { await invoke('device_control_play', { host: active.host, name: 'baked' }); } catch { /* ignore */ void 0; }
                     addToast(`Bake & Upload started (${seconds}s @${fps} FPS)`, 'info');
                   } catch (e:any) { addToast(mapUploadError(String(e)), 'error'); }
                 }}>Bake & Upload</button>
                 <label style={{ fontSize: 12, opacity: 0.9 }}>Sec
                   <input type="number" min={0.1} step={0.1} value={seconds} onChange={e => setSeconds(Math.max(0.1, parseFloat(e.target.value)||1))} style={{ width: 64, marginLeft: 4 }} />
+                </label>
+                <label title="If enabled, scales baked pixels so no channel exceeds the current brightness slider." style={{ fontSize: 12, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input type="checkbox" checked={capByBrightness} onChange={e => { setCapByBrightness(e.target.checked); try { localStorage.setItem('prism.bake.capByBrightness', JSON.stringify(e.target.checked)); } catch { /* ignore */ void 0; } }} /> Cap payload by brightness
                 </label>
                 <label style={{ fontSize: 12, opacity: 0.9 }}>FPS
                   <input type="number" min={1} step={1} value={fps} onChange={e => { setFps(Math.max(1, parseInt(e.target.value)||120)); if (upload.phase==='cancelled') upload.reset(); }} style={{ width: 64, marginLeft: 4 }} />
@@ -505,10 +590,10 @@ export default function DevicePanel() {
                   <input type="text" value={paletteStr} onChange={e => { setPaletteStr(e.target.value); if (upload.phase==='cancelled') upload.reset(); }} placeholder="#ff0000,#00ff00" style={{ width: 240, marginLeft: 4 }} />
                 </label>
                 <label title="If enabled, prefer on-device palette blending when supported" style={{ fontSize: 12, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input type="checkbox" checked={devicePaletteBlend} onChange={e => { setDevicePaletteBlend(e.target.checked); try { localStorage.setItem('prism.palette.deviceBlend', JSON.stringify(e.target.checked)); } catch {} }} /> Device palette blend
+                  <input type="checkbox" checked={devicePaletteBlend} disabled={!statusInfo || (statusInfo && typeof statusInfo.caps === 'number' && (statusInfo.caps & CAP_PALETTE) === 0)} onChange={e => { setDevicePaletteBlend(e.target.checked); try { localStorage.setItem('prism.palette.deviceBlend', JSON.stringify(e.target.checked)); } catch { /* ignore */ void 0; } }} /> Device palette blend
                 </label>
                 <label style={{ fontSize: 12, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }}>Geometry
-                  <select value={geometryId} onChange={e => { setGeometryId(e.target.value); try { localStorage.setItem('prism.geometry.id', e.target.value); } catch {} }} style={{ marginLeft: 4 }}>
+                  <select value={geometryId} onChange={e => { setGeometryId(e.target.value); try { localStorage.setItem('prism.geometry.id', e.target.value); } catch { /* ignore */ void 0; } }} style={{ marginLeft: 4 }}>
                     <option value="K1_LGP_v1">K1_LGP_v1</option>
                   </select>
                 </label>

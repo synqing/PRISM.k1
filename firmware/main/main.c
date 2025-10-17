@@ -24,6 +24,8 @@
 #include "led_playback.h"
 #include "template_manager.h"
 #include "bench_decode.h"
+// UART test mode
+void uart_test_start(void);
 
 static const char *TAG = "PRISM-K1";
 
@@ -171,6 +173,11 @@ void app_main(void)
     ESP_ERROR_CHECK(playback_init());   /* RMT LED Driver (Task 8 complete) */
     ESP_ERROR_CHECK(templates_init());  /* Template catalog (stub) */
     ESP_LOGI(TAG, "All components initialized");
+
+#if CONFIG_PRISM_UART_TEST
+    ESP_LOGI(TAG, "Starting UART test mode...");
+    uart_test_start();
+#endif
 
     /* Create statistics reporting task (heap monitor runs automatically) */
     xTaskCreate(stats_reporting_task, "stats_report", 2048, NULL, 1, NULL);

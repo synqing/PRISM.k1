@@ -16,4 +16,5 @@ export const CAP_COMPRESS = 1 << 0;
 export const CAP_RESUME   = 1 << 1;
 export const CAP_EVENTS   = 1 << 2;
 export const CAP_PALETTE  = 1 << 3;
-
+export const CAP_PROGRAM  = 1 << 4;
+export const CAP_V09      = 1 << 5;

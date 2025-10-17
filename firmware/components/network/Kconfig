@@ -1,0 +1,11 @@
+menu "PRISM Network/Test"
+
+config PRISM_UART_TEST
+    bool "Enable UART test mode"
+    default y
+    help
+      Enables a simple UART0 line-based command interface for BEGIN/DATA/END
+      and CONTROL commands to drive uploads without Wi‑Fi.
+
+endmenu
+

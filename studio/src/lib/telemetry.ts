@@ -15,7 +15,7 @@ export async function appendTelemetry(e: TelemetryEvent) {
     const { writeTextFile, exists, mkdir } = await import('@tauri-apps/plugin-fs');
     const line = JSON.stringify(e) + '\n';
     const dir = 'logs';
-    try { if (!await (exists as any)(dir)) await (mkdir as any)(dir); } catch {}
+    try { if (!await (exists as any)(dir)) await (mkdir as any)(dir); } catch { /* ignore */ void 0; }
     const path = 'logs/upload.jsonl';
     // Append by read+concat if append not available
     try {
@@ -26,6 +26,5 @@ export async function appendTelemetry(e: TelemetryEvent) {
     } catch {
       await (writeTextFile as any)(path, line);
     }
-  } catch { /* ignore */ }
+  } catch { /* ignore */ void 0; }
 }
-

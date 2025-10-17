@@ -1,0 +1,4 @@
+[profile.default]
+test-timeout = "60s"
+status-level = "fail"
+

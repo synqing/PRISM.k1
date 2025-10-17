@@ -37,6 +37,12 @@ CONTROL (`0x20`) subcommands and payloads:
 - `0x10` BRIGHTNESS – `[target:u8][duration_ms_be:u16]` (target 0..255)
 - `0x11` GAMMA      – `[gamma_x100_be:u16][duration_ms_be:u16]` (e.g., 220 == 2.20)
 
+### Ranges & Semantics
+
+- PLAY name: ASCII ≤63 chars; sanitize `A–Z a–z 0–9 . _ -`.
+- BRIGHTNESS: `0..255`; duration `0..5000 ms` (clamped); ramp is device‑side linear.
+- GAMMA: `100..300` (x100, i.e., 1.00–3.00); duration `0..5000 ms` (clamped). Device applies immediately or ramps.
+
 ## STATUS Schema (device owns)
 
 Payload fields, little-endian multi-byte integers:
@@ -58,6 +64,18 @@ Payload fields, little-endian multi-byte integers:
 - Device validates CRC at PUT_END (no CRC in PUT_END payload). PUT_END payload is empty.
 - App cancels upload by closing WS (no PUT_END); device must clear session on close.
 - App queries STATUS and honors `maxChunk` before PUT_DATA.
+
+## Error Taxonomy (mapping)
+
+Device error frames (type `0xFF`) should include a short code; Studio maps to guidance:
+
+- `ERR_BUSY` → Device busy. Retry after current operation.
+- `ERR_SIZE_EXCEEDED` → Pattern exceeds 256KB. Reduce duration/complexity.
+- `ERR_CRC_MISMATCH` → CRC mismatch; check network stability and retry.
+- `ERR_OFFSET_OVERFLOW` → Client sent data beyond declared size; abort and restart.
+- `ERR_SESSION_MISSING` → PUT_DATA/END without BEGIN; restart upload.
+
+Studio uploader also surfaces local errors: `WS_CONNECT_FAILED`, `WS_SEND_FAILED`, `WS_CLOSED`, `TLV_*` validation.
 
 ## Proposed v0.9 Deltas (for discussion)
 

@@ -13,11 +13,11 @@ set(PROJECT_VER "1.0.0")
 # Configure components directory
 set(EXTRA_COMPONENT_DIRS
     "components/core"
-    # TODO: Enable as components are implemented
-    # "components/network"
-    # "components/storage"
-    # "components/playback"
-    # "components/templates"
+    "components/network"
+    "components/storage"
+    "components/playback"
+    "components/templates"
+    "components/bench"
 )
 
 # Project declaration
