@@ -33,12 +33,16 @@ fi
 
 # [1/5] Check CANON freshness
 echo -e "${BLUE}[1/5] Checking CANON freshness...${NC}"
-CURRENT_CANON_HASH=$(shasum -a 256 "$CANON" | cut -d' ' -f1)
+CURRENT_STRIPPED=$(mktemp)
+grep -Ev '^(> \*\*GENERATED:|\*\*Last Validation:|SHA256: |Generated: )' "$CANON" > "$CURRENT_STRIPPED"
+CURRENT_CANON_HASH=$(shasum -a 256 "$CURRENT_STRIPPED" | cut -d' ' -f1)
 
-# Generate fresh CANON to temp file
+# Generate fresh CANON into a temp file without overwriting current (deterministic timestamp)
 TMP_CANON=$(mktemp)
-"$SCRIPTS_DIR/generate-canon.sh" > /dev/null 2>&1
-FRESH_CANON_HASH=$(shasum -a 256 "$CANON" | cut -d' ' -f1)
+CANON_TIMESTAMP="FROZEN" OUTPUT_FILE="$TMP_CANON" "$SCRIPTS_DIR/generate-canon.sh" > /dev/null 2>&1 || true
+FRESH_STRIPPED=$(mktemp)
+grep -Ev '^(> \*\*GENERATED:|\*\*Last Validation:|SHA256: |Generated: )' "$TMP_CANON" > "$FRESH_STRIPPED"
+FRESH_CANON_HASH=$(shasum -a 256 "$FRESH_STRIPPED" | cut -d' ' -f1)
 
 if [ "$CURRENT_CANON_HASH" != "$FRESH_CANON_HASH" ]; then
     echo -e "  ${RED}✗ CANON.md is outdated${NC}"
